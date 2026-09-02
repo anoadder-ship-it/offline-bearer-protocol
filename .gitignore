@@ -1,0 +1,16 @@
+target/
+node_modules/
+test-ledger/
+.anchor/
+*.log
+*.deb
+.xray/
+dist/
+
+# Private keypairs — NOOIT committen. De canonieke identiteit leeft buiten
+# deze repo, onder ~/.config/offline-bearer-protocol/program-keypairs/
+# (zie STATUS.md sectie 4). target/deploy/obp_core-keypair.json is daar een
+# symlink naartoe, geen kopie.
+*-keypair*.json
+*-keypair-new.json
+id.json

@@ -1,0 +1,32 @@
+{
+  "name": "offline-bearer-protocol",
+  "version": "0.1.0",
+  "private": true,
+  "description": "OBP — OfflineBearer Protocol: bearer coins je volledig offline kunt halen, offline kunt overdragen en veilig weer kunt checken-in (core op Solana; L2-rolout later)",
+  "scripts": {
+    "test": "anchor test"
+  },
+  "dependencies": {
+    "@coral-xyz/anchor": "^0.31.1",
+    "@solana/spl-token": "^0.4.15",
+    "@solana/web3.js": "^1.98.0",
+    "bn.js": "^5.2.1"
+  },
+  "devDependencies": {
+    "@noble/curves": "^1.6.0",
+    "@noble/hashes": "^1.5.0",
+    "@types/bn.js": "^5.1.5",
+    "@types/mocha": "^10.0.6",
+    "@types/node": "^26.2.0",
+    "mocha": "^10.2.0",
+    "ts-mocha": "^10.0.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.3.3"
+  },
+  "overrides": {
+    "serialize-javascript": "^7.1.1",
+    "jayson": {
+      "uuid": "^11.1.1"
+    }
+  }
+}

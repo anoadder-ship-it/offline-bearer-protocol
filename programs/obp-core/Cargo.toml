@@ -1,0 +1,28 @@
+[package]
+name = "obp-core"
+version = "0.1.0"
+description = "OBP Core — OfflineBearer Protocol: bearer coins, lokale chains, check-in + dispute (SPEC.md)"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "lib"]
+name = "obp_core"
+
+[features]
+no-entrypoint = []
+no-idl = []
+no-log-ix-name = []
+cpi = ["no-entrypoint"]
+idl-build = ["anchor-lang/idl-build", "anchor-spl/idl-build"]
+default = []
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = [
+    'cfg(feature, values("custom-heap"))',
+    'cfg(feature, values("custom-panic"))',
+    'cfg(feature, values("anchor-debug"))',
+] }
+
+[dependencies]
+anchor-lang = { version = "1.1.2", features = ["init-if-needed"] }
+anchor-spl = "1.1.2"

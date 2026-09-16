@@ -1,7 +1,7 @@
 [package]
 name = "obp-core"
 version = "0.1.0"
-description = "OBP Core — OfflineBearer Protocol: bearer coins, lokale chains, check-in + dispute (SPEC.md)"
+description = "OBP Core — offline bearer coin protocol (SPEC.md)"
 edition = "2021"
 
 [lib]
@@ -13,16 +13,15 @@ no-entrypoint = []
 no-idl = []
 no-log-ix-name = []
 cpi = ["no-entrypoint"]
-idl-build = ["anchor-lang/idl-build", "anchor-spl/idl-build"]
 default = []
-
-[lints.rust]
-unexpected_cfgs = { level = "warn", check-cfg = [
-    'cfg(feature, values("custom-heap"))',
-    'cfg(feature, values("custom-panic"))',
-    'cfg(feature, values("anchor-debug"))',
-] }
+# Zie active-defense programs/*/Cargo.toml (les uit sectie 29/30 daar):
+# idl-build opent `print_idl()` pas met de `cpi`-feature.
+idl-build = ["anchor-lang/idl-build", "anchor-spl/idl-build", "cpi"]
 
 [dependencies]
 anchor-lang = { version = "1.1.2", features = ["init-if-needed"] }
 anchor-spl = "1.1.2"
+# Sha256 voor de state-hash (SPEC §3.2). Exacte pin = versie die anchor-lang
+# zelf al in de lock heeft (3.1.0) → type-unificatie, geen extra download.
+# Zelfde conventie als active-defense (solana-sha256-hasher = "3.1.0").
+solana-sha256-hasher = "3.1.0"

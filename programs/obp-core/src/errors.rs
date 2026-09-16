@@ -8,14 +8,19 @@ pub enum ObpError {
     WindowTooSmall,
     #[msg("max_links_per_tx must be >= 1")]
     MaxLinksTooSmall,
-    // M1 (SPEC §5):
-    #[msg("Mint registry entry already exists for this serial")]
-    SerialExists,
     #[msg("Coin value must be > 0")]
     ZeroValue,
+    #[msg("Bond amount overflows u64")]
+    BondOverflow,
+    #[msg("Attempt must be 0 or 1")]
+    AttemptRange,
+    #[msg("Too many submissions for this serial (max 2, R-E)")]
+    DuplicateSubmission,
     #[msg("Allowance exceeded for recipient (mint-gate, B6)")]
     AllowanceExceeded,
-    #[msg("Vault balance cannot drop below total_unspent_supply (I2)")]
+    #[msg("Allowance cap cannot be set below committed")]
+    AllowanceCapBelowCommitted,
+    #[msg("Vault cannot drop below total_unspent_supply (I2)")]
     VaultUnderflow,
     #[msg("Serial in chain does not match mint registry")]
     SerialMismatch,
@@ -31,8 +36,18 @@ pub enum ObpError {
     StatusInvalid,
     #[msg("Too many links in one tx (max_links_per_tx)")]
     MaxLinksExceeded,
+    #[msg("Empty links vec")]
+    EmptyLinks,
+    #[msg("Submission state buffer full (chain longer than MAX_SUBMISSION_STATES)")]
+    StatesFull,
     #[msg("Challenge window expired")]
     WindowExpired,
-    #[msg("More than two submissions per serial")]
-    DuplicateSubmission,
+    #[msg("Submission does not match this serial")]
+    SubmissionMismatch,
+    #[msg("Bond escrow transfer failed")]
+    BondEscrowFailed,
+    #[msg("head_owner does not match the on-chain head-state owner")]
+    OwnerAnchorMismatch,
+    #[msg("last_hash does not match the hash of the final submitted state")]
+    LastHashMismatch,
 }

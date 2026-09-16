@@ -226,7 +226,7 @@ Uit `SPEC.md` §12 (M0–M8), samengevat:
 | M | Status (2026-09-02) |
 |---|---|
 | M0 voorbereiding | **AFGEROND (2026-09-02)**: repo, keypair + 2 backups, spec v0.1, STATUS, skeleton, build groen + ID byte-geverifieerd (sectie 5), git-init + lokale commit. **Nog niet gepusht** — afwacht Q5-akkoord. |
-| M1 programma compleet | te beginnen na Q1–Q5-akkoord |
+| M1 programma compleet | **AFGEROND (2026-09-17)**: 10 instructies, 5/5 unit-tests, volledige devnet-lus groen (E1–E8) — sectie 9 |
 | M2 TS-client | — |
 | M3 E2E-bewijsmatrix devnet (E1–E10) | — |
 | M4 PQ (implementatie + benchmark + matrix herhalen) | — |
@@ -235,9 +235,199 @@ Uit `SPEC.md` §12 (M0–M8), samengevat:
 | M7 L2-scheiding (optimistic rollup) | — |
 | M8 mainnet-prep | — |
 
-**Vervolgstappen (volgorde, na akkoord):**
-1. Q1–Q5 beantwoorden (Michel).
-2. M0 afronden: push (één commit).
-3. M1: `obp-core` compleet bouwen (alle instructies SPEC §5) + unit-tests.
-4. M2: TS-client (CoinFile model + gestageerde check-in).
-5. M3: E1–E10 op devnet, alles in STATUS vastleggen (slots, signatures, CU-metingen).
+**Vervolgstappen (volgorde):**
+1. ~~Q1–Q5 beantwoorden~~ — akkoord 2026-09-03 ("akkord met alles").
+2. ~~M0 push~~ — gedaan (commit 346a95a, main).
+3. ~~M1~~ — afgerond, zie sectie 9.
+4. **M2**: OBP TS-SDK (`obp-js`) + CoinFile spec v1.
+5. **M3**: E2E-bewijsmatrix E1–E10 incl. negatieve gevallen (sectie 9.4).
+6. **M2.5 (parallel)**: SpankWallet-integratie (closed actions, sectie 10).
+7. M4+: PQ (met CU-kanttekening 9.3.4), channels, ZK, L2, mainnet.
+
+
+## 9. M1 — obp-core compleet + devnet-smoke (AFGEROND, 2026-09-17)
+
+### 9.1 Resultaat (bewijs)
+
+Volledige protocol-lus groen op devnet. Idempotente smoke
+(`smoke-m1-idempotent.ts`, deterministische keys), programma
+`9D2fU2g13Y55uvk6kLiHRknxd6rzu84nsHy6gnjTLqzt`:
+
+| Stap | Instructie | Resultaat (laatste run) |
+|---|---|---|
+| E0 | SPL-mint + 6 ATAs | OK (idempotent) |
+| E1 | init (config, vaultPda, feePda) | OK (state bestond) |
+| E2 | ping | OK (sig `29SttJuVt5C1w72B…`) |
+| E3 | fund_vault | vault = 1000 |
+| E4 | mint_coin (value=100, serial=sha256("obp-m1-smoke-coin-001")) | registry = ACTIVE(0) |
+| E5 | start_check_in (bond=100 → escrow) | submission = PENDING(2) |
+| E6 | append_links (2 links; ed25519-precompile 2×) | states_len = 3 |
+| E7 | finalize_check_in | submission = PENDING, head gezet |
+| E8 | settle (na window) | OK (sig `2dvQCqqXJLPhjLDA…`) |
+
+Eindstate (on-chain, gemeten): **holder3 = 100** (value → final_owner),
+**recipient = 500** (400 rest + bond-refund 100), **vault = 900**,
+**registry = SPENT(1)**, **submission = WON(5)**.
+Supply-conservatie: 1000 = 900 + 100 ✓.
+Unit-tests: **5/5 groen** (state_ops ×3 + `allowance_borsh_layout_regression` + 1).
+
+### 9.2 Programma & deploy
+
+10 instructies: `init, ping, fund_vault, withdraw_vault, mint_coin,
+start_check_in, append_links, finalize_check_in, settle, set_allowance`.
+
+- Deploy: `9D2fU2g13Y55uvk6kLiHRknxd6rzu84nsHy6gnjTLqzt`
+  (BPFLoaderUpgradeable; **upgrade-authority = `G1qgHzMxNHqewWEKzEoV46GUXjDrsuD4P8LQ97T6gNXp`**
+  = fee-payer wallet `~/.config/solana/id.json` — upgrade's vereisen die keypair).
+- Laatste build: **356520 B, SBPF v3 (e_flags=0x3)**; on-chain programdata
+  (`9wdyFKDV4N74fM6QypJ2hFxU1W5QtkjWn9iZ1jbFjbt3`) = lokale `.so` als exacte
+  byte-prefix @ offset 45 + 143640 B nul-padding (account krimpt niet bij
+  upgrade — gemeten). Verificatie-script: `.obp-staging/verify-so.js`.
+- Program-keypair: `~/.config/offline-bearer-protocol/program-keypairs/obp-core-v3.json`.
+- Deploy-geschiedenis: `5oUPUTu…` (M0; v0-`.so` → runtime access-violation @0x8)
+  → `9sbzeTmp…` (bump-fixes; v0) → **`9D2fU2g…`** (nieuw keypair + `declare_id!`,
+  v3; huidig). Nieuw keypair i.p.v. cleanup: oude PDAs waren pre-bump-fix met
+  bump=0 gecreëerd én top-level PDA-signatures (voor drain/close) zijn op deze
+  CLI niet haalbaar gemeten → verse start was de goedkopere bewijsroute.
+
+### 9.3 Kern-leringen (alles gemeten)
+
+1. **SBPF v0 vs v3 — root cause "Access violation writing 48 bytes at 0x8"**:
+   `cargo build-sbf` default = `--arch v0`; v0-layout (.text @0x120,
+   0x0–0x11F unallocated) draait niet op moderne Agave (devnet =
+   solana-core 4.3.0-rc.0). v3: .rodata @0x0, .text @4GiB (MM_-constanten
+   geleverd in `solana-sbpf`-bron). Fix = `--arch v3`. Conclusie voor
+   active-defense: de "v1.54-toolchain-defect" (STATUS §30, zelfde symptoom)
+   was de v0-arch, niet de toolchain (hun builds draaiden ook v0-default).
+2. **Toolchains**: v1.52-platform-tools (rust `1.89.0-sbpf-solana-v1.52`)
+   heeft **geen** `sbpfv3-solana-solana`-stdlib (gemeten rustlib: sbpf/sbpfv1/
+   sbpfv2 only) → v3 kan er niet mee bouwen. v1.54 wél
+   (`~/.cache/solana/v1.54/platform-tools/rust`, rustc 1.89.0-dev).
+   → `build-sbf.sh` bijgewerkt: `--tools-version v1.54 --arch v3`.
+3. **CU-model op deze devnet (4.3.0-rc.0, fee-gebaseerd)**: expliciete
+   `setComputeUnitLimit` faalt vrijwel altijd (gemeten: max ≈1000 CU bij
+   price=0; 51k CU faalt bij price 0..1e9; bredere meting eerdere sessie:
+   limit 200..1.4M × price 0..1e12 → allemaal `ComputationalBudgetExceeded`).
+   Zonder budget-ix: default **200k CU** werkt (gemeten consumpties:
+   init=23162, mint_coin=29255, settle=22949). **Regel: geen expliciete
+   CU-budget in de client; het programma moet binnen 200k passen.**
+4. **ed25519: dalek → precompile**: pure-Rust dalek in BPF ≈ 90k+ CU/verify;
+   ed25519-precompile (`Ed25519SigVerify1111…`) = **2400 CU/verify**.
+   Signatuurverificatie is daarom een top-level precompile-ix (offsets naar
+   de append-ix-data), niet in-program. **M4-kanttekening (PQ)**:
+   pure-Rust SLH-DSA/ML-DSA-verificatie stuit op dezelfde CU-muur → dan
+   syscall/batching meten (nog geen PQ-syscall in agave 4.3 gemeten).
+5. **Anchor-borsh-layout — root cause E8-settle-bug**: Anchor-account-data =
+   **discriminator(8) + fields**; ruw borsh (`AnchorSerialize`/
+   `AnchorDeserialize`, `try_from_slice`/`serialize`) = **fields only (18 B
+   voor Allowance)**. De handmatige parse/write-helpers (remaining_accounts)
+   gebruikten ruw borsh → alle fields 8 bytes verschoven gelezen.
+   `Submission` overleefde toevallig (geen bool-field); `Allowance` heeft
+   `initialized: bool` → las de eerste byte van `committed` (100 = 0x64) →
+   `Invalid bool representation: 100` (BorshIoError). Fix:
+   `AccountDeserialize::try_deserialize` (disc-check + fields) en
+   `AccountSerialize::try_serialize` (disc + fields). Regressietest
+   `allowance_borsh_layout_regression` pindt de exacte on-chain payload:
+   ruw borsh faalt, Anchor-parse slaagt, round-trip byte-identiek (26 B).
+6. **PDA-bump-discipline** (gevonden in E5): PDA-structs slaan hun eigen
+   `bump` op; de maker moet die zetten (`ctx.bumps.<x>` bij init,
+   `find_program_address` bij init_if_needed). Geen enkele handler deed dat
+   → alle PDAs gecreëerd met bump=0, re-derivatie met
+   `bump = <account>.bump` faalde (reëel = 254). Fix in init/mint_coin/
+   start_check_in/finalize. Helpers `sub_pda`/`allowance_pda` gebruiken
+   `find_program_address` (bump-byte in de seeds).
+7. **SBF-frame-limit (4096 B/functie)**: het `#[program]`-macro inline alle
+   `try_accounts` in één dispatch → grootste struct bepaalt het frame
+   (FinalizeCheckIn = 6.3 KB → crash). Refactor: `Option`-accounts →
+   `remaining_accounts`, `TokenAccount` → `UncheckedAccount` (+ handmatige
+   `check_tok`), handlers opgesplitst in `#[inline(never)]`-helpers,
+   `last_state` als reference. Resultaat: 0 frame-warnings, programma draait.
+8. **Devnet-programdata bij upgrade**: account krimpt niet (oude grootte +
+   nul-padding; gemeten 500160 B @ 356520 B ELF). Bewijsmethode voor
+   "welke code draait": on-chain elf @ offset 45 byte-vóór-byte vergelijken
+   met lokale `.so` (`verify-so.js`).
+
+### 9.4 Openstaand / volgende
+
+- **M2**: `obp-js` SDK + CoinFile spec v1 (codec, instruction-builders,
+  state-readers, idempotente orchestration — port van de smoke-logica).
+- **M3**: E2E-bewijsmatrix E1–E10 incl. **negatieve gevallen**: twee
+  submissions op één serial (double-spend R3/R4), append ná finalize,
+  window-race, allowance-exceeded, settle met verkeerde other_attempt.
+- **Strategisch**: wallet-koppeling + SpankWallet-integratie — analyse in
+  sectie 10, afwacht Q6/Q7.
+- **Push**: M1-staat lokaal gecommit; push na akkoord (conventie: niets
+  pushen zonder akkoord).
+
+## 10. Strategisch: wallet-koppeling + SpankWallet (analyse, afwacht beslissing)
+
+Invoer: Grok-advies (één reference wallet starten, protocol wallet-agnostic
+houden) + de vraag "koppelen aan 1 specifieke wallet?".
+
+### Oordeel
+
+Kern akkoord — maar met drie scherpere punten:
+
+**1. De wallet is een host, geen security-boundary.**
+Het OBP-security-model (bonds, head/nullifier, challenge window, allowance,
+supply-invarianten) zit on-chain in `obp-core` — wallet-agnostisch en
+auditeerbaar. De wallet draagt de *device-key trust-assumpties*:
+CoinFile-versleuteling, offline states, orchestration van de gestageerde
+check-in. De security-kritische client-logica (CoinFile-codec, precompile-
+offsets, idempotency) hoort in een **versioneerde SDK + spec** (obp-js +
+CoinFile v1), niet in één wallet. Juiste vraag is dus niet "SpankWallet óf
+nieuwe wallet" maar "welke wallet host de SDK" — en dat is vrijblijvend
+zolang de SDK + spec scherp zijn.
+
+**2. Reference wallet: SpankWallet uitbreiden, als closed actions (fase B) —
+niet execute_advanced (fase A) als eindpunt.**
+SpankWallet-architectuur (gemeten, lokaal): passkeys + session keys,
+allowlist (`MAX_ALLOWED_PROGRAMS`), vault, policy + spend-window, 2-fase
+acties (`Initiate*`/`Finalize*` + `PendingAction` + `CancelAction`).
+- `execute_advanced` = opene CPI-doorgeefluik. OBP-flows zijn multi-transaction
+  (start → append×k → finalize → settle) met exacte account- en offset-
+  eisen — precies de bugklasse waar M1 dagen over deed (remaining_accounts-
+  volgorde, precompile-offsets, 8-byte-borsh-verschuiving). Closed actions
+  fixen die constructie-riské in één auditeerbare plek; passthrough verspreidt
+  die naar elke aanroeper.
+- OBP's challenge window (finalize → settle) mapt 1-op-1 op SpankWallet's
+  Initiate/Finalize + time-lock → consistente security-UX ("actie kan pas na X
+  worden afgerond").
+- Fase A (allowlist + execute_advanced) = devnet-scaffolding voor demo-snelheid;
+  niet de reference-UX.
+
+Voorgestelde actie-set (fase B, in het spankwallet-programma):
+`obp_mint_coin` (vault → obp-core, policy-gated, serial+recipient gebonden),
+`obp_checkin_start` / `obp_checkin_append` / `obp_checkin_finalize` /
+`obp_settle` / `obp_dispute` (elk eigen challenge-domain, vaste CPI-shape,
+session-key-vriendelijk). Client-side: CoinFile import/export (QR/USB/file),
+"coins in challenge window"-weergave, allowance (committed/cap) per wallet.
+
+**3. Het echte werk en risico zit client-side, niet in het programma.**
+M2 is waar de grootste resterende risico's zitten: CoinFile-formaat
+(versioning, encryptie, serialisatie van states+signatures), offline-transfer-
+UX, crash-recovery (gestageerde check-in moet idempotent zijn — de smoke is
+het; de client ook), en de **recovery-story** (device verloren: wat betekent
+"verlies van de lokale chain" in het product; encryptie-backup? social
+recovery?). Threat model voor de CoinFile expliciet in de spec: het bestand
+is een **bearer-instrument** — wie het kan decrypten, kan check-in doen;
+encryptie is privacy + verliesbescherming, géén verdediging tegen een
+tegenstander met het bestand. Hardware-binding = optioneel en breekt het
+bearer-principe (cash) → trade-off documenteren.
+
+### Plan (ingemengd in de roadmap)
+
+| M | Scope |
+|---|---|
+| M2 | `obp-js` SDK + CoinFile spec v1 + unit-tests met vectors uit de devnet-run |
+| M3 | E2E-matrix E1–E10 + negatieve gevallen + CU-metingen (alle slots/sigs in STATUS) |
+| M2.5 | SpankWallet-integratie fase B (closed actions + CoinFile-UX in client) |
+| M4+ | PQ (met 9.3.4-CU-kanttekening), channels, ZK, L2, mainnet |
+
+### Overleg (Q6–Q7)
+
+- **Q6**: SpankWallet als reference wallet bevestigen (fase B closed actions,
+  fase A alleen als scaffolding)?
+- **Q7**: CoinFile-encryptiekey: **passkey-afgeleid** (SpankWallet: recovery
+  via WebAuthn, maar online-ceremonie nodig) óf **device-lokale key** (écht
+  offline, maar device verloren = coin verloren tenzij er encryptie-backup is)?

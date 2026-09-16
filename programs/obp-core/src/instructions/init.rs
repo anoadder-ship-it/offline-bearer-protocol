@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
 
 use crate::errors::ObpError;
-use crate::state::Config;
+use crate::state::{Config, FeePda, VaultPda};
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
 pub struct InitArgs {
@@ -22,14 +22,32 @@ pub struct Init<'info> {
         bump
     )]
     pub config: Account<'info, Config>,
-    /// Claims the mint-authority role by signing (SPEC §2, A3).
+    /// Marker: de eigenaar van het vault-token-account (SPEC §4, A3/A4).
+    #[account(
+        init,
+        payer = payer,
+        space = VaultPda::LEN,
+        seeds = [b"vault"],
+        bump
+    )]
+    pub vault_pda: Account<'info, VaultPda>,
+    /// Marker: eigenaar van het fee-sink token-account (DoS-fee's, SPEC §5.10).
+    #[account(
+        init,
+        payer = payer,
+        space = FeePda::LEN,
+        seeds = [b"fee"],
+        bump
+    )]
+    pub fee_pda: Account<'info, FeePda>,
+    /// Claimt de mint-authority-role door te tekenen (SPEC §2, A3).
     pub mint_authority: Signer<'info>,
     #[account(mut)]
     pub payer: Signer<'info>,
     pub system_program: Program<'info, System>,
 }
 
-pub fn init(ctx: Context<Init>, args: InitArgs) -> Result<()> {
+pub fn init<'info>(ctx: Context<Init<'info>>, args: InitArgs) -> Result<()> {
     require!(
         args.bond_multiplier_bps >= 10_000,
         ObpError::BondBelowParity
@@ -38,10 +56,7 @@ pub fn init(ctx: Context<Init>, args: InitArgs) -> Result<()> {
         args.challenge_window_slots >= 1,
         ObpError::WindowTooSmall
     );
-    require!(
-        args.max_links_per_tx >= 1,
-        ObpError::MaxLinksTooSmall
-    );
+    require!(args.max_links_per_tx >= 1, ObpError::MaxLinksTooSmall);
 
     let config = &mut ctx.accounts.config;
     config.mint_authority = ctx.accounts.mint_authority.key();
@@ -51,6 +66,12 @@ pub fn init(ctx: Context<Init>, args: InitArgs) -> Result<()> {
     config.max_links_per_tx = args.max_links_per_tx;
     config.default_allowance = args.default_allowance;
     config.total_unspent_supply = 0;
+    config.sig_scheme = 0; // M1: Ed25519 (B5/B8)
+    // PDA-bumps opslaan: latere instructies derivaten deze PDA's met
+    // `bump = <account>.bump` (o.a. vault_pda.bump voor token-account-ownership).
+    config.bump = ctx.bumps.config;
+    ctx.accounts.vault_pda.bump = ctx.bumps.vault_pda;
+    ctx.accounts.fee_pda.bump = ctx.bumps.fee_pda;
 
     msg!(
         "obp-core init: mint_authority={}, vault_mint={}, bond_bps={}, window_slots={}, max_links_per_tx={}",
@@ -68,12 +89,11 @@ pub struct Ping<'info> {
     pub config: Account<'info, Config>,
 }
 
-pub fn ping(ctx: Context<Ping>) -> Result<()> {
-    // `crate::ID.as_ref()` materializeert de 32 id-bytes in .rodata, zodat de
+pub fn ping<'info>(ctx: Context<Ping<'info>>) -> Result<()> {
+    // `crate::ID.as_ref()` materialiseert de 32 id-bytes in .rodata, zodat de
     // byte-verificatie (active-defense-conventie, STATUS.md sectie 5) op een
-    // contiguous sequence kan zoeken. Meetresultaat M0 zonder deze regel: de id
-    // kwam 0× raw in de .so voor (fat-LTO inline de array als immediates in de
-    // `!=`-vergelijking van try_entry). Met as_ref()-gebruik: 1× (zie STATUS §5).
+    // contiguous sequence kan zoeken. Zonder zo'n as_ref()-gebruik inline
+    // fat-LTO de array als immediates (meetresultaat M0: 0x raw in de .so).
     msg!(
         "obp-core ping: mint_authority={}, total_unspent_supply={}, id_first_byte={}",
         ctx.accounts.config.mint_authority,

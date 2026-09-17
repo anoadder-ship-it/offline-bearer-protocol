@@ -511,3 +511,9 @@ M1-smoke — de on-chain vector-test bewaakt dat.
   of terugkom-polling (M3.5).
 - CU-metingen per instructie staan nog niet systematisch in deze tabel (M3).
 - SpankWallet fase B (M2.5) nog niet gestart; Q6/Q7 blijven open (zie §10).
+- **Security (beurstable dev-deps)**: via  in  opgelost:
+   (GHSA-528h) → 3.6.0,  (GHSA-w5hq) → 14.0.2; tests + live-RPC
+  na-update groen.  (GHSA-3gc7, high) **geaccepteerd**: er bestaat
+  géén gefixte release upstream (alleen ≤1.1.5), de kwetsbare functie
+  () ligt niet in onze code-paths, en de dep is dev-only (geen
+  runtime-dienst). Re-evaluatie punt zodra @solana/buffer-layout-utils een fix pinnt.

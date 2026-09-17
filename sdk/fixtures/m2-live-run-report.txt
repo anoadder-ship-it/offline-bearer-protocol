@@ -1,0 +1,12 @@
+config: vaultMint Dio6wyfZiRH3o8WDhoGRLJ17kbd92ezxworcy8k4YutU | bps 10000 | window 10 | maxLinks 4
+   ping: OK Vimcbyeb2RVNR9DB (CU=3008)
+vault balance: 900
+coin: n=3 states, owner=HBaSqo8JrBwsf8avxuAcN8k4yBrzXqQNVJ11HerL1EeC
+   settle: OK 2QtnbZkovM5AL8jo (CU=30141)
+--- M2 LIVE RUN REPORT ---
+serial: a748a89d46e187b198e7a919a98dda2cd81626b283acf4fd06b6e9ae8bebc9e9
+ step: start_check_in (overgeslagen, submission bestaat; status=2) 
+ step: finalize (overgeslagen, al PENDING) 
+ step: settle 2QtnbZkovM5AL8joyEc9 CU=30141
+final: {"registryStatus":1,"submissionStatus":5,"finalOwnerBalance":"200","checkerBalance":"500","vaultBalance":"800"}
+totaal: %.1fs 0.627

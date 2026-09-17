@@ -1,0 +1,21 @@
+{
+  "name": "obp-js",
+  "version": "0.1.0",
+  "private": true,
+  "description": "OBP TypeScript SDK: CoinFile-codec, ketenverificatie, instruction-builders, idempotente check-in-orchestration (SPEC: docs/coinfile-spec-v1.md)",
+  "type": "module",
+  "scripts": {
+    "test": "bun test"
+  },
+  "dependencies": {
+    "@noble/curves": "^1.6.0",
+    "@noble/hashes": "^1.5.0",
+    "@solana/spl-token": "^0.4.15",
+    "@solana/web3.js": "^1.98.0"
+  },
+  "devDependencies": {
+    "@types/node": "^26.2.0",
+    "bun-types": "latest",
+    "typescript": "^5.3.3"
+  }
+}

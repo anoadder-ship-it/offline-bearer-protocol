@@ -431,3 +431,83 @@ bearer-principe (cash) → trade-off documenteren.
 - **Q7**: CoinFile-encryptiekey: **passkey-afgeleid** (SpankWallet: recovery
   via WebAuthn, maar online-ceremonie nodig) óf **device-lokale key** (écht
   offline, maar device verloren = coin verloren tenzij er encryptie-backup is)?
+
+## 11. M2 — obp-js SDK + CoinFile spec v1 (AFGEROND, 2026-09-17)
+
+### Wat er staat
+
+- `sdk/` — `obp-js` TypeScript/Bun SDK (14 modules in `src/`), `bun install` OK,
+  geen build-stap (directe TS-run via Bun). Publieke API via `src/index.ts`.
+- `docs/coinfile-spec-v1.md` — CoinFile v1: ongewijzigd CoinCore (bytes van de
+  M1-coin, spec-koppel) + GCM-wrapper (A256GCM, keyHint, AAD=serial),
+  deterministisch, versie-veld voor de toekomst (Q7-agnostisch).
+- `sdk/fixtures/` — on-chain vectors uit de M1-run (`m1-coin.json`) + M2-evidence
+  (`m2-live-run-report.txt`).
+
+### Module-indeling (src/)
+
+| module | rol |
+|---|---|
+| constants.ts | program-ID, PDA-seeds, SigScheme, CU-limieten |
+| layout.ts | state-encoder/decoder (104 B: serial, value, owner, prevHash) + `stateHash` |
+| coinfile.ts | CoinCore-codec (magic, versie, serial, value, states, sigs, sha256-checksum) |
+| wrapper.ts | GCM encrypt/decrypt (A256GCM, keyHint, AAD) |
+| chain.ts | `verifyCoinChain` (hashketen + ed25519 + optioneel genesis-anker) |
+| coin.ts | `newCoin`/`appendLink` (offline keten) + `ed25519Signer` + `currentOwner` |
+| accounts.ts | PDA-afleiding (config, registry, submission, vault, fee, allowance, head) |
+| precompile.ts | `ed25519VerifyIx` (Ed25519SignatureOffsets, 14 B/record, offsets→append-data) |
+| instructions.ts | alle ix-builders (init … settle), byte-identiek aan de M1-smoke |
+| readers.ts | on-chain lezers (fetchConfig/Registry/Submission/Head/Allowance) |
+| client.ts | `ObpClient` (RPC + simulate-voor + send + CU) |
+| orchestrate.ts | `runCheckIn` (start→append→finalize→settle, idempotent, ATA-precreatie) |
+| index.ts | publieke exporten |
+
+### Testen (`bun test` — 15/15 groen)
+
+- **CoinCore-codec** (4): round-trip n=1, round-trip n=3, checksum-detecteert-corruptie,
+  magic/versie/grootte worden afgedwongen.
+- **Ketenverificatie** (6): geldige keten slaagt, beschadigde sig faalt, verkeerde
+  tekenaar faalt, fork (prevHash) faalt, waarde-verschuiving faalt, genesis-anker.
+- **GCM-wrapper** (3): round-trip, verkeerde key faalt (GCM-tag), keyHint-mismatch faalt.
+- **M1 on-chain vectors** (2): SDK-reconstructie == on-chain bytes (**byte-voor-byte**),
+  signatures verifieken onder de juiste keys (onafhankelijke check).
+
+### M2-acceptatie: de SDK drijft de hele lus op devnet
+
+`bun scripts/sdk-live-run.ts` — nieuwe coin `obp-m2-sdk-coin-001` (value 100),
+2 offline transfers (recipient→holder2→holder3), dan start→append×2 (met
+ed25519-precompile)→finalize→settle. **Resultaat (evidence: fixtures/m2-live-run-report.txt):**
+
+- `settle: OK 2QtnbZkovM5AL8joyEc9` (CU=30141)
+- final: `registryStatus=1` (SPENT), `submissionStatus=5` (WON)
+- `finalOwnerBalance=200` (holder3: 100 M1 + 100 M2-waarde)
+- `checkerBalance=500` (recipient: 400 na bond-escrow + 100 bond-refund)
+- `vaultBalance=800` (900 − 100)
+
+Alle balansen kloppen exact. De SDK produceert byte-identieke instructies als de
+M1-smoke — de on-chain vector-test bewaakt dat.
+
+### Bugs gevonden + opgelost tijdens M2 (bewijs-cultuur: elk met een test)
+
+| bug | oorzaak | fix |
+|---|---|---|
+| 0/12 tests (v0) | `sha256()` levert `Uint8Array` (geen `.copy`/`.equals`) | `asBuf()`/`Buffer.from()`-normalisatie |
+| elke geldige keten faalt | `chain.ts` vergelijkt `state[i].prevHash` met `H(state[i])` i.p.v. `H(state[i-1])` | `prevH = stateHash(states[i-1])` |
+| keten-tests faalden | dummy-pubkeys `Buffer.alloc(32,1)` (niet op ed25519-curve) → verify=terecht false | echte deterministische ed25519-keypairs in tests |
+| submission-reader offset | `MAX_SUBMISSION_STATES=4` (niet 8) → LEN=543, bump@542 (ik: 958) | bump = `d.length-1` (robust voor MAX) |
+| simulateTransaction crash | web3.js 1.99 verwacht een `Transaction`/`Message`, geen ruwe `Buffer` | `simulateTransaction(tx)` (intern gekopieerd) |
+| mint_coin → 3007 | key-posities 4/5 verwisseld (ATA(vaultPda) vs vaultPda-**account**) | smoke-orde hersteld (empirisch bewijs: A9→3007, B9→OK) |
+| start_check_in → 3012 | escrow-ATA (owner=submission-PDA) bestond nog niet (`AccountNotInitialized`) | `getOrCreateAssociatedTokenAccount` vóór start |
+| append_links → Custom:3 | laatste precompile-record `msgOff = BASE+n*LINK+32` (=444, buiten de data) i.p.v. `BASE+n*LINK` (=412 = `last_hash`) | de `+32` verwijderd |
+| window-wait hang | `getSlot()` → `Promise<number>` (geen `{value}`-object) in web3.js 1.99 | `const slot = await getSlot()` |
+| `checker != currentOwner` | `runCheckIn` dwong `checker==currentOwner` af; het programma accepteert **elke** checker (M1 gebruikte de recipient). Drie rollen verward | rollen gescheiden: `checker` (bond) / `finalOwner` (waarde=on-chain) / `mintRecipient` (allowance); SDK leest de on-chain waarden |
+
+### Kanttekeningen / over naar M3
+
+- SDK is **devnet-afgedwongen** maar nog niet gepubliceerd (npm); lokaal `bun`-runbaar.
+- E2E-matrix E1–E10 + negatieve gevallen (M3): fork-resolutie (DISPUTED), REJECTED,
+  LOST, attempt=1 (R-E: max 2 submissions per serial), max_links-per-tx, states-full.
+- `runCheckIn` wacht synchroon op de challenge-window; voor productie: event-driven
+  of terugkom-polling (M3.5).
+- CU-metingen per instructie staan nog niet systematisch in deze tabel (M3).
+- SpankWallet fase B (M2.5) nog niet gestart; Q6/Q7 blijven open (zie §10).

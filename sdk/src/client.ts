@@ -21,7 +21,7 @@ export class ObpClient {
 
   constructor(connOrUrl: Connection | string, opts: ObpClientOpts = {}) {
     this.conn = typeof connOrUrl === 'string' ? new Connection(connOrUrl, 'confirmed') : connOrUrl;
-    this.maxRetries = opts.max429Retries ?? 5;
+    this.maxRetries = opts.max429Retries ?? 10; // devnet-rate-limit-storm (M3): ruime budget
     this.log = opts.onLog ?? (() => {});
   }
 
@@ -56,9 +56,10 @@ export class ObpClient {
       } catch (e) {
         const msg = String(e);
         attempts++;
-        if (attempts >= this.maxRetries || !msg.includes('429')) throw e;
+        const retryable = msg.includes('429') || msg.toLowerCase().includes('blockhashnotfound');
+      if (attempts >= this.maxRetries || !retryable) throw e;
         this.log(label + ': 429, retry ' + attempts + '...');
-        await new Promise((r) => setTimeout(r, 2000 * attempts));
+        await new Promise((r) => setTimeout(r, Math.min(8000, 1500 * attempts)));
       }
     }
   }

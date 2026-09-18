@@ -6,8 +6,8 @@ worden. Zelfde functie en stijl als spankwallet's en active-defense' `STATUS.md`
 elke claim is of gemeten (met bewijs) of een expliciete beslissing (B-nummer) of een
 expliciete openstaande vraag (Q-nummer). Geen aannames.
 
-Laatst bijgewerkt: 2026-09-02 — M0-voorbereiding: repo aangemaakt, keypair + backup,
-spec v0.1, tooling-inventarisatie met bewijs (secties 1–8). Build-bewijs M0: sectie 5.
+Laatst bijgewerkt: 2026-09-18 — M3 E2E-bewijsmatrix devnet AFGEROND: **14/14 PASS** (sectie 12).
+Voorafgaand: M2 SDK + CoinFile v1 (sectie 11, 2026-09-17), M1 obp-core (sectie 9, 2026-09-17).
 
 ---
 
@@ -227,8 +227,8 @@ Uit `SPEC.md` §12 (M0–M8), samengevat:
 |---|---|
 | M0 voorbereiding | **AFGEROND (2026-09-02)**: repo, keypair + 2 backups, spec v0.1, STATUS, skeleton, build groen + ID byte-geverifieerd (sectie 5), git-init + lokale commit. **Nog niet gepusht** — afwacht Q5-akkoord. |
 | M1 programma compleet | **AFGEROND (2026-09-17)**: 10 instructies, 5/5 unit-tests, volledige devnet-lus groen (E1–E8) — sectie 9 |
-| M2 TS-client | — |
-| M3 E2E-bewijsmatrix devnet (E1–E10) | — |
+| M2 TS-client | **AFGEROND (2026-09-17)**: obp-js SDK + CoinFile spec v1, devnet-afgedwongen — sectie 11 |
+| M3 E2E-bewijsmatrix devnet (E1–E10) | **AFGEROND (2026-09-18)**: 14/14 PASS, CU-tabel + bevindingen — sectie 12 |
 | M4 PQ (implementatie + benchmark + matrix herhalen) | — |
 | M5 channels | — |
 | M6 ZK/blind-laag (optioneel) | — |
@@ -239,8 +239,8 @@ Uit `SPEC.md` §12 (M0–M8), samengevat:
 1. ~~Q1–Q5 beantwoorden~~ — akkoord 2026-09-03 ("akkord met alles").
 2. ~~M0 push~~ — gedaan (commit 346a95a, main).
 3. ~~M1~~ — afgerond, zie sectie 9.
-4. **M2**: OBP TS-SDK (`obp-js`) + CoinFile spec v1.
-5. **M3**: E2E-bewijsmatrix E1–E10 incl. negatieve gevallen (sectie 9.4).
+4. ~~**M2**~~ — afgerond, zie sectie 11.
+5. ~~**M3**~~ — afgerond, zie sectie 12.
 6. **M2.5 (parallel)**: SpankWallet-integratie (closed actions, sectie 10).
 7. M4+: PQ (met CU-kanttekening 9.3.4), channels, ZK, L2, mainnet.
 
@@ -517,3 +517,88 @@ M1-smoke — de on-chain vector-test bewaakt dat.
   géén gefixte release upstream (alleen ≤1.1.5), de kwetsbare functie
   () ligt niet in onze code-paths, en de dep is dev-only (geen
   runtime-dienst). Re-evaluatie punt zodra @solana/buffer-layout-utils een fix pinnt.
+
+
+## 12. M3 — E2E-bewijsmatrix devnet (AFGEROND, 2026-09-18)
+
+### 12.1 Resultaat (bewijs)
+
+**14/14 PASS in 113.2s** op devnet — programma `5oUPUTuSdU3bWLtVTdcisu1BtgwNt29jH4fVTnfH2XiM`,
+vault-mint `Dio6wyfZiRH3o8WDhoGRLJ17kbd92ezxworcy8k4YutU` (bond 100 bps, window 10 slots,
+max_links_per_tx=4). Ruwe log: `sdk/evidence/m3-matrix-14of14.log`. Script:
+`sdk/scripts/e2e-matrix.ts` (her-runbaar: per-run nonce voor E2/E3/E8 → verse coins,
+idempotente helpers, 429/BlockhashNotFound-retries, vault-top-up in setup).
+
+| # | Test | Wat het bewijst | Resultaat |
+|---|------|-----------------|-----------|
+| E10a | set_allowance verhoog → OK | B6: cap schrijfbaar door mint-recipient | PASS (cap=1M, committed=300) |
+| E6 | append 5 links → "Transaction too large: 1324 > 1232" | max_links_per_tx=4 fysiek afgedwongen door de 1232-B tx-limiet; MaxLinksExceeded(6016) = defensieve backstop | PASS |
+| E10b | set_allowance(50) < committed → 6008 | AllowanceCapBelowCommitted (I5) | PASS |
+| E7b | 5de state → 6018 StatesFull | MAX_SUBMISSION_STATES=4 | PASS |
+| E2a | finalize casus A → head PENDING (headAttempt=0, len=2) | R2 first-come: eerste finalizer wordt (provisionele) head | PASS |
+| E2b | B met extensie (len 3>2) wint; A LOST; registry SPENT | C2: strikte extensie wint de dispute | PASS |
+| E2c | holder3 +200 (refund+C1+value), vault −100, A-escrow→0 | C1-compensatie + value-flow, via on-chain balansen | PASS |
+| E3a | B identiek (tie) → LOST; A blijft PENDING | R2: tie → head wint | PASS |
+| E3b | settle A na window → WON, SPENT | R5/R6: settle van de head | PASS |
+| E3c | recipient +200 (C1-comp + eigen refund), B 0, vault −100 | C1-compensatie aan verdediger + bond-refund | PASS |
+| E8a | settle te vroeg → 6019 WindowExpired | challenge-window beschermt de head tegen vroege settle | PASS |
+| E8b | settle na window → WON | R5: settle sluit af | PASS |
+| E4 | start op SPENT-registry → 6015 StatusInvalid | dubbel-spend geblokkeerd (R-E) | PASS |
+| E5 | herstart bestaand attempt → geblokkeerd | init/escrow-validatie vóór count-check (defensief) | PASS |
+
+### 12.2 CU-tabel (unitsConsumed, gemeten via simulateTransaction in dezelfde run)
+
+| instructie | CU |
+|---|---|
+| mint_coin | 31197 |
+| start_check_in | 17221 |
+| append_links(n=1) | 6658 |
+| append_links(n=2) | 7053 |
+| finalize(casusA) | 36362 |
+| finalize(casusB-win) | 45422 |
+| finalize(casusB-lose) | 31918 |
+| settle | 24141 |
+
+Zwaarst: finalize casus B win (45.4k CU) — dubbele full-chain-verificatie + 3 token-transfers.
+Alles ver onder de 200k-limiet; set_allowance = 3977 CU (in log, niet in tabel).
+
+### 12.3 Bevindingen (alles gemeten in deze run)
+
+1. **max_links_per_tx=4 is fysiek afgedwongen door de Solana-tx-limiet**: 5 links =
+   1324 B > 1232 B → "Transaction too large" al client-side, vóórdat MaxLinksExceeded(6016)
+   bereikt kan worden. De on-chain check is een defensieve backstop (blijft relevant bij
+   grotere tx-limieten of compactere encoding).
+2. **final_owner se ATA moet pré-existeren vóór finalize/settle**: `check_tok` vereist
+   Token-program-eigendom; een ontbrekende account is System-owned → BondEscrowFailed(6021).
+   Client-verplichting: `getOrCreateAssociatedTokenAccount` eerst (in productie doet de
+   wallet dit bij eerste ontvangst van tokens).
+3. **I2-vault-invariant is een harde mint-gate**: mint vereist
+   `vault.amount >= total_unspent_supply + value`; de vault is een reserve die bij win/settle
+   wordt aangesproken (`total -= value`, waarde uit vault naar winnaar). Zonder slack →
+   VaultUnderflow(6009). Reserve aanvullen via `fund_vault` (SPEC §5.2) of directe mint naar
+   de vault-ATA.
+4. **Dubbel-spend**: start op SPENT-registry → StatusInvalid(6015) via struct-constraint
+   (`registry.status == ACTIVE`). Kanttekening: de escrow-ATA moet bestaan, anders faalt
+   Anchor-deserialisatie eerst met 3012 AccountNotInitialized (validatierangschikking).
+5. **Herstart bestaand attempt** wordt geblokkeerd door init/escrow-validatie vóór de
+   submissions_count-check (defensief; simulate geeft een account-fout, geen Custom-error).
+
+### 12.4 SDK-fixes tijdens M3 (elk afgedwongen door een matrix-test)
+
+- **`finalizeIx` casus B: `allowancePda(mintRecipient)` → `[0]`** — echte bug: pda-helpers
+  retourneren `[key, bump]`; het tuple als account-key gaf "unknown signer" in web3.js'
+  compileMessage. (sdk/src/instructions.ts)
+- **ObpClient.send**: retry-budget 5→10 + capped backoff (≤8s); ook op BlockhashNotFound
+  (devnet-rate-limit-storm). (sdk/src/client.ts)
+- **readers.fetchData**: 429-retry met backoff (zelfde patroon als client). (sdk/src/readers.ts)
+
+### 12.5 Kanttekeningen / over naar M4
+
+- `bun test` na alle SDK-fixes: **15/15 pass, 0 fail** (48 expect-calls).
+- Matrix is her-runbaar maar gebruikt per run verse coins voor E2/E3/E8 (nonce); eerdere
+  debug-coins blijven op devnet staan (total_unspent_supply=300 = 3 onopgeloste coins).
+- `runCheckIn` (M2) wacht synchroon op de challenge-window; voor productie: event-driven of
+  terugkom-polling (M3.5).
+- **Volgende: M4 PQ** — ed25519 → postkwantum (sig_scheme=1), benchmark + matrix herhalen;
+  CU-kanttekening §9.3.4 blijft gelden. SpankWallet fase B (M2.5) nog niet gestart; Q6/Q7
+  blijven open (§10).

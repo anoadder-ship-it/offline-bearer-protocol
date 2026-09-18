@@ -129,16 +129,25 @@ export function finalizeIx(
   /** submission.final_owner — krijgt de waarde (winner_token). */
   finalOwner: PublicKey,
   vaultMint: PublicKey, payer: PublicKey,
+  /** Casus B (head bestaat = fin_resolve): echte remaining_accounts.
+   *  [0]=other submission, [1]=other escrow, [2]=other checker-token,
+   *  [3]=allowance (win-tak I5). Zonder caseB: 4 PROGRAM_ID-placeholders
+   *  (casus A — de andere attempt bestaat niet nog). */
+  caseB?: { otherChecker: PublicKey },
 ): TransactionInstruction {
   const [cfg] = configPda(); const [reg] = registryPda(serial); const [hd] = headPda(serial);
   const [sub] = submissionPda(serial, attempt); const [vp] = vaultPda(); const [fp] = feePda();
+  const [otherSub] = submissionPda(serial, otherAttempt);
   const args = Buffer.concat([asBuf(serial), u8b(otherAttempt), pk(mintRecipient)]);
+  const remaining = caseB
+    ? [w(otherSub, true), w(ata(vaultMint, otherSub), true), w(ata(vaultMint, caseB.otherChecker), true), w(allowancePda(mintRecipient)[0], true)]
+    : [w(PROGRAM_ID), w(PROGRAM_ID), w(PROGRAM_ID), w(PROGRAM_ID)];
   const keys = [
     w(cfg, true), w(reg, true), w(hd, true), w(sub, true),
     w(ata(vaultMint, sub), true), w(ata(vaultMint, checker), true),
     w(ata(vaultMint, finalOwner), true), w(ata(vaultMint, vp), true), w(vp),
     w(ata(vaultMint, fp), true), w(fp), w(TOKEN_PROGRAM_ID), s(payer, true), w(SYS),
-    w(PROGRAM_ID), w(PROGRAM_ID), w(PROGRAM_ID), w(PROGRAM_ID),
+    ...remaining,
   ];
   return new TransactionInstruction({ programId: PROGRAM_ID, keys, data: ixData('finalize_check_in', args) });
 }

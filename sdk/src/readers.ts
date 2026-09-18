@@ -126,9 +126,22 @@ export function parseAllowance(d: Buffer): OnChainAllowance {
   };
 }
 
+// devnet rate-limit (429): retry met backoff — zelfde patroon als ObpClient.send.
 async function fetchData(conn: Connection, pda: PublicKey): Promise<Buffer | null> {
-  const acc = await conn.getAccountInfo(pda);
-  return acc ? Buffer.from(acc.data) : null;
+  for (let i = 0; ; i++) {
+    let acc;
+    try {
+      acc = await conn.getAccountInfo(pda);
+    } catch (e) {
+      const s = String(e);
+      if (i < 5 && (s.includes('429') || s.toLowerCase().includes('rate limit'))) {
+        await new Promise((r) => setTimeout(r, 1500 * (i + 1)));
+        continue;
+      }
+      throw e;
+    }
+    return acc ? Buffer.from(acc.data) : null;
+  }
 }
 
 export const fetchConfig = async (conn: Connection) => (async () => {

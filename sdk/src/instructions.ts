@@ -183,3 +183,13 @@ export function setAllowanceIx(newCap: bigint | number, wallet: PublicKey): Tran
   const [al] = allowancePda(wallet);
   return new TransactionInstruction({ programId: PROGRAM_ID, keys: [s(wallet), w(al, true)], data: ixData('set_allowance', u64le(newCap)) });
 }
+
+// M4 (PQ, B8): benchmark-instructies voor in-program PQ-verificatie.
+export function pqBenchmarkIx(dataAccount: PublicKey, scheme: number): TransactionInstruction {
+  return new TransactionInstruction({ programId: PROGRAM_ID, keys: [w(dataAccount)], data: ixData('pq_benchmark', u8b(scheme)) });
+}
+
+export function pqWriteDataIx(dataAccount: PublicKey, offset: number, chunk: Buffer): TransactionInstruction {
+  const args = Buffer.concat([u32le(offset), u32le(chunk.length), chunk]);
+  return new TransactionInstruction({ programId: PROGRAM_ID, keys: [w(dataAccount, true)], data: ixData('pq_write_data', args) });
+}

@@ -18,6 +18,16 @@ declare_id!("9D2fU2g13Y55uvk6kLiHRknxd6rzu84nsHy6gnjTLqzt");
 pub mod obp_core {
     use super::*;
 
+    /// M4-benchmark: in-program PQ-verificatie (CU-meting). scheme 1=ML-DSA-44, 2=SLH-DSA-128f.
+    pub fn pq_benchmark<'info>(ctx: Context<PqBenchmark>, scheme: u8) -> Result<()> {
+        instructions::pq::pq_benchmark(ctx, scheme)
+    }
+
+    /// M4-benchmark-setup: vul een data-account met PQ-bytes in chunks (≤1024 B/ix).
+    pub fn pq_write_data<'info>(ctx: Context<PqWriteData>, offset: u32, chunk: Vec<u8>) -> Result<()> {
+        instructions::pq::pq_write_data(ctx, offset, chunk)
+    }
+
     /// Init: Config + VaultPda + FeePda (SPEC §5.1).
     pub fn init<'info>(ctx: Context<Init<'info>>, args: InitArgs) -> Result<()> {
         instructions::init(ctx, args)

@@ -116,7 +116,7 @@ credentia**l (de munt kan 10 jaar meegaan, pas daarna gecheckt-in). Gevolgen:
   check-in forgeren van een munt die niet meer van hem is. De schade is beperkt door
   de bond, maar de aanval is goedkoop en stil.
 - Aanbeveling: de lokale chain vanaf dag één tekenen met **PQ-handtekeningen**:
-  ML-DSA (Dilithium, FIPS 204) of SLH-DSA (SPHINCS+, FIPS 205). SLH-DSA past
+  ML-DSA (Dilithium, FIPS 203) of SLH-DSA (SPHINCS+, FIPS 205). SLH-DSA past
   specifiek bij het muntmodel: vers keypair per munt, beperkt aantal signatures per
   key, verificatie-cost is eenmalig bij check-in.
 - ZK (fase 3 van Grok's plan) is waar de PQ-risk het grootst is: Groth16/KZG e.a.

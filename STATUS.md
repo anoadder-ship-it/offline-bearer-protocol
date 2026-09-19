@@ -6,8 +6,8 @@ worden. Zelfde functie en stijl als spankwallet's en active-defense' `STATUS.md`
 elke claim is of gemeten (met bewijs) of een expliciete beslissing (B-nummer) of een
 expliciete openstaande vraag (Q-nummer). Geen aannames.
 
-Laatst bijgewerkt: 2026-09-18 — M3 E2E-bewijsmatrix devnet AFGEROND: **14/14 PASS** (sectie 12).
-Voorafgaand: M2 SDK + CoinFile v1 (sectie 11, 2026-09-17), M1 obp-core (sectie 9, 2026-09-17).
+Laatst bijgewerkt: 2026-09-19 — M4 PQ-analyse + infrastructuur (sectie 13): negatieve benchmark-resultaten (ML-DSA-44 >1.4M CU; SLH-DSA-128f stack-overflow), architectuur-beslissing Track 1/2 (optimistische validiteit + C-port-meting), deterministische PQ-vectoren versiebaard, programma-identiteit verifieerd (beide devnet-programma's draaien dezelfde M4-PQ-build, byte-voor-byte).
+Voorafgaand: M3 E2E-bewijsmatrix devnet AFGEROND: **14/14 PASS** (sectie 12), M2 SDK + CoinFile v1 (sectie 11, 2026-09-17), M1 obp-core (sectie 9, 2026-09-17).
 
 ---
 
@@ -138,6 +138,16 @@ De staging-map wordt na elke overdracht geruimd via `python3 -c "import shutil; 
   beide eerst.
 - **`target/deploy/obp_core-keypair.json`** wordt een symlink naar de werkende
   locatie (geen kopie) — aangemaakt bij de eerste build (M0).
+- **Werkprogramma devnet (M1–M3): `9D2fU2g13Y55uvk6kLiHRknxd6rzu84nsHy6gnjTLqzt`**
+  (aangenomen 2026-09-19, D5). Keypair:
+  `~/.config/offline-bearer-protocol/program-keypairs/obp-core-v3.json`;
+  **backup (byte-geverifieerd, sha256 6e7efaf0…):**
+  (backup buiten de repo; locatie niet gepubliceerd).
+  Upgrade-authority = fee-payer wallet `G1qgHzMx…` (`~/.config/solana/id.json`) —
+  upgrade's vereisen die keypair. `5oUPUTu…` (het M0-keypair van hierboven) is het
+  M0-programma; beide adressen draaien sinds de M4-benchmark **dezelfde** M4-PQ-build
+  (621336 B, byte-geverifieerd 2026-09-19, §13.2 item 6). Beslissing voor Track 1:
+  `5oUPUTu…` wordt het Track-1-programma (verse layout), `9D2fU2g…` afgevallen.
 
 ## 5. Build-pipeline (M0-skeleton)
 
@@ -523,7 +533,7 @@ M1-smoke — de on-chain vector-test bewaakt dat.
 
 ### 12.1 Resultaat (bewijs)
 
-**14/14 PASS in 113.2s** op devnet — programma `5oUPUTuSdU3bWLtVTdcisu1BtgwNt29jH4fVTnfH2XiM`,
+**14/14 PASS in 113.2s** op devnet — programma `9D2fU2g13Y55uvk6kLiHRknxd6rzu84nsHy6gnjTLqzt` *(correctie 2026-09-19: hier stond `5oUPUTu…`; bewijs: `sdk/src/constants.ts` @ commit 417125a wijst op 9D2fU2g, de SDK drijft de matrix; de 5oUPUTu-verwijzing was een doc-fout — zie §13.2 item 6)*,
 vault-mint `Dio6wyfZiRH3o8WDhoGRLJ17kbd92ezxworcy8k4YutU` (bond 100 bps, window 10 slots,
 max_links_per_tx=4). Ruwe log: `sdk/evidence/m3-matrix-14of14.log`. Script:
 `sdk/scripts/e2e-matrix.ts` (her-runbaar: per-run nonce voor E2/E3/E8 → verse coins,
@@ -602,3 +612,124 @@ Alles ver onder de 200k-limiet; set_allowance = 3977 CU (in log, niet in tabel).
 - **Volgende: M4 PQ** — ed25519 → postkwantum (sig_scheme=1), benchmark + matrix herhalen;
   CU-kanttekening §9.3.4 blijft gelden. SpankWallet fase B (M2.5) nog niet gestart; Q6/Q7
   blijven open (§10).
+
+## 13. M4 — PQ (post-kwantum): bevindingen + architectuur-analyse (2026-09-18, WIP)
+
+### 13.1 Gemeten negatieve resultaten (evidence: docs/m4-pq-benchmark-results.txt)
+
+Program `9D2fU2g…` (621336 B, SBPF v3, met in-program PQ-code), simulatie met
+`setComputeUnitLimit(1.4M)`:
+
+| schema | implementatie | resultaat | oorzaak |
+|---|---|---|---|
+| ML-DSA-44 | RustCrypto `ml-dsa` 0.1 (no_std, alloc) | **FAIL**: "exceeded CUs meter" bij CU=1.399.850 (het max) | verificatie kost **>1.4M CU** = Solana's MAX_COMPUTE_UNIT_LIMIT |
+| SLH-DSA-SHA2-128f | `slh-dsa` 0.2.0-rc.5 | **FAIL**: "Access violation in stack frame 0 at 0x1fffffbf0" bij CU=616 | SBF-VM-stack-overflow (1 MB): hypertree-traversal in deze implementatie |
+
+Build-time: frame-warnings mldsa44_verify ≈62 KB, slhdsa128f_verify ≈43 KB
+(per-functielimiet 4096 B — linker waarschuwt; de runtime-1MB-stack is de harde muur).
+
+**Doc-fix (bewijs: NIST, aug 2024):** ML-DSA = **FIPS 203** (niet 204 — FIPS 204 =
+ML-KEM). De M4-bestanden + `pq.rs`-comment noemen foutief 204.
+
+### 13.2 Gemeten context-facten (deze sessie, bron gecontroleerd)
+
+1. **Agave 4.3.0-rc.0 heeft géén PQ-precompile/syscall** — bron-grep over
+   `agave/programs/` + `agave/runtime/src` (ml-dsa|ml_dsa|slh|sphincs|post-quantum):
+   geen hits; programs/ = bpf_loader, compute-budget, ed25519, sbf, system, vote,
+   zk-elgamal-proof, zk-token-proof. → in-program (Rust of C) is de enige route.
+2. **Het programma-kern is scheme-agnostisch** (checkin.rs:12-16, 289-295; state.rs):
+   on-chain `Submission.states = [[u8; 104]; 4]` — **alleen states, géén
+   signatuur-bytes**. De on-chain-chain is structureel (hashketen +
+   `genesis_state_hash`-anker in MintRegistry). Signatuur-geldigheid wordt in
+   scheme 0 (Ed25519) afgedwongen door de **client-side precompile** in dezelfde
+   tx (2400 CU/verify; een ongeldige sig faalt de hele tx — atomair).
+   → PQ vereist **géén on-chain layout-migratie**; de layout is al PQ-klaar.
+3. **Constraint die aangepast moet:** `config.sig_scheme == 0` op start_check_in /
+   append_links / finalize / settle (checkin.rs:113,225,463,877) — moet `{0,1}`
+   worden (2 = gereserveerd).
+4. **CoinCore v1 heeft vaste 64 B-signaturen** (sdk/src/coinfile.ts;
+   `sigs: (n-1) × 64`) + `sigScheme`-veld (al aanwezig). PQ → **CoinFile v2**
+   (magic OBC2, sigSize afgeleid van scheme: ML-DSA-44 = 2420 B).
+5. **Devnet-CU-model (4.3.0-rc.0, fee-gebaseerd):** default 200k CU; expliciete
+   budget-claims faalen vrijwel altijd (§9.3.3). → Zelfs een 300k-CU verificatie
+   draait hier niet; CU-*kosten* meten via simulate (1.4M claim werkt wél in
+   simulatie — de ML-DSA-meting is dus geldig), maar draaibaarheid op mainnet
+   vereist het normale fee-model.
+6. **Twee programma's draaien op devnet, identieke code (byte-geverifieerd):**
+   `5oUPUTu…` (programdata 67tvdard…; ELF 625728 B = M4-PQ-build 621336 B + 4392 B
+   nul-padding) en `9D2fU2g…` (programdata 9wdyFKDV…; ELF 621336 B, sha256
+   69562517…). ELF5[:621336] == ELF9 → **dezelfde M4-PQ-build**. M3-matrix liep op
+   **9D2fU2g** (bewijs: constants.ts @ 417125a wijst daarop; §12-correg). Lokale
+   `target/deploy/obp_core.so` (515584 B) is een ander artifact van dezelfde
+   build-run (cargo-post-processing; niet-deployed). Conclusie: de
+   "5oUPUTu vs 9D2fU2g"-inconsistentie was alleen een doc-kwestie (§12) + de
+   keuze welk adres het Track-1-programma wordt (beslist: 5oUPUTu, zie §4).
+7. **`/tmp/pqvec` (benchmark-vectoren) is weg** (volatile tmp) → vectoren
+   deterministisch regenereren + in `sdk/fixtures/pq/` versioneren.
+
+### 13.3 Architectuur-conclusie (de kern)
+
+De M4-vraag was "kan PQ-verificatie on-chain?". Gemeten antwoord voor
+RustCrypto-referentie-implementaties: nee (>1.4M CU / stack-overflow). Maar het
+programma-kern bleek structureel te verifiëren en signatures uit de on-chain-path
+te kunnen buiten — wat de architectuurroute opent:
+
+**Track 1 — Optimistische validiteit (fase-1-PQ-design; ontgrendelt de roadmap):**
+- On-chain: structureel (hashketen + genesis-anker + head-regels + bonds +
+  window) — scheme-onafhankelijk, al gebouwd.
+- PQ-signaturen: **offline geverifieerd door de bearer bij elke overdracht**
+  (cash-analogie: de ontvanger controleert de munt; de bearer *is* de
+  verificatielaag) + **de checker re-verifieert de volledige chain offline
+  vóór het bond staken** (SDK-verplichte stap; `verifyCoinChain` bestaat al,
+  moet scheme-aware worden).
+- Dispute: een **validity-challenge** binnen de window (status `DISPUTED` = 3
+  bestaat al in de layout, momenteel onbruikt) → coin "stuck, not stolen":
+  default = waarde blijft in de vault (REJECTED na tweede window), bonds
+  terug; of resolutie via de in-program-verificatie van Track 2 zodra die er is.
+- Kwantificeerbare exposure: per coin ≤ V, vereist een PQ-forging (zonder QC
+  ≈ onwaarschijnlijk) of systematische verifieer-bug; vault-netto-exposure
+  begrensd (I2: elke coin = één V-reserve, één keer uitbetaald).
+- Program-wijziging: klein (constraint `{0,1}`; optioneel sigCommit, R2).
+
+**Track 2 — C-geoptimaliseerde ML-DSA-44 in-program (meting M4.1, upgrade-pad):**
+- FIPS 203 reference-C (portable path, geen SIMD) op SBF; statische arrays
+  (kleine frames) i.p.v. de RustCrypto-locals.
+- Meten op **local validator** (standaard CU-model, 1.4M budget) — de devnet-
+  fee-model is een cluster-instelling, geen VM-eigenschap.
+- Hypothese (niet bewezen): ~250–750k CU → haalbaar op mainnet (priority fee),
+  onhaalbaar op deze devnet (200k-cap).
+- Bij success: optionele "verified check-in"-instructie (sig-bytes via
+  data-account, `pq_write_data`-chunks bestaan al) → trustless PQ voor
+  high-value coins. Upgradeable programma + ongewijzigde sig-bytes → géén
+  state-migratie.
+- Dit maakt de PQ-keuze een *engineering*-keuze, geen *design*-dwang.
+
+**R2 (optioneel, ter beslissing):** per-link `sigCommit = H(sig)[0..32]` in de
+`Submission` (+128 B/account, +32 B sha256/link ≈ trivial CU). Binde de on-chain-
+states aan de offline-signaturen; een in dispute geüploade signature moet
+`H(sig) == sigCommit` voldoen → deterministische in-program-resolutie mogelijk.
+Trade-off: layout-wijziging vóór mainnet (nu nog gratis; devnet-state reset).
+
+**Schema-keuze (aanbeveling):** **ML-DSA-44** als PQ-referentie (FIPS 203;
+sig 2420 B; pk 1312 B — kleinste FIPS-sig; device-verificatie ≈ ms).
+SLH-DSA (sig 7.8–17 KB) uit fase-1-scope; `sig_scheme=2` gereserveerd.
+
+### 13.4 Overlegpunten (D-serie)
+
+- **D1 (PQ-route):** Track 1 (optimistische validiteit) als fase-1-PQ-design,
+  Track 2 (C-port meting) parallel als upgrade-pad? (aanbeveling: ja)
+- **D2 (dispute-default):** validity-challenge → "stuck, not stolen" (waarde
+  blijft in vault, REJECTED na tweede window) vs. mint-authority-beslissing vs.
+  federatie? (aanbeveling: stuck-not-stolen + optionele authority-override)
+- **D3 (schema):** ML-DSA-44 (FIPS 203) als PQ-referentie; SLH-DSA uit scope?
+  (aanbeveling: ja)
+- **D4 (R2 sigCommit):** per-link signature-commitment in Submission
+  (+128 B)? (aanbeveling: ja — layout is nu nog gratis vóór mainnet)
+- **D5 (opruiming):** (a) M3-commit `417125a` pushen? (b) programma unificeren
+  op canoniek `5oUPUTu…` (M4-build daar deployen, SDK wijzen, `9D2fU2g…`
+  afvallen + documenteren)? (c) PQ-vectoren in `sdk/fixtures/pq/`
+  versioneren? (aanbeveling: alles ja)
+- **D6 (volgorde):** M4.1 = eerst Track 1 doorvoeren (SPEC + program + SDK +
+  matrix herdraaien met PQ-coin), dan Track 2-meting? (aanbeveling: ja)
+- Q6/Q7 (SpankWallet M2.5) blijven open — inplannen ná D-beslissingen (het
+  CoinFile-v2-formaat dat de wallet host is eerst vast).

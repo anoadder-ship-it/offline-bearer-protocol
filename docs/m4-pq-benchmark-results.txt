@@ -1,0 +1,37 @@
+M4-PQ-BENCHMARK RESULTATEN (devnet, 2025)
+Program: 9D2fU2g13Y55uvk6kLiHRknxd6rzu84nsHy6gnjTLqzt (obp-core, SBFv3, 621336 B met PQ-code)
+Baseline (ping + setComputeUnitLimit(1.4M), simulatie): CU=3158
+
+=== ML-DSA-44 (FIPS 203) ===
+data-account: 3770 B (pk_len(4)+pk(1312)+msg_len(4)+msg(30)+sig(2420))
+RESULT: FAIL — "exceeded CUs meter at BPF instruction" bij CU=1,399,850 (het max per tx)
+→ ML-DSA-44 verificatie kost > 1.4M CU → MEER dan Solana's MAX_COMPUTE_UNIT_LIMIT (1_400_000).
+→ NIET haalbaar als één on-chain instructie.
+
+=== SLH-DSA-SHA2-128f (FIPS 205) ===
+data-account: 17158 B (pk_len(4)+pk(32)+msg_len(4)+msg(30)+sig(17088))
+RESULT: FAIL — "Access violation in stack frame 0 at address 0x1fffffbf0 of size 8" bij CU=616
+→ Stack-overflow: de SPHINCS+-verificatie (hypertree-traversal) gebruikt meer SBF-stack dan beschikbaar.
+→ NIET haalbaar zoals gebouwd met slh-dsa 0.2.0-rc.5.
+
+=== Build-time frame-warnings (cargo build-sbf --arch v3) ===
+mldsa44_verify:   overflows max frame space, offset 63104 B (~62 KB)
+slhdsa128f_verify: overflows max frame space, offset 44096 B (~43 KB)
+
+=== Conclusie ===
+Beide FIPS-204/205-schemas overschrijden Solana's per-transactie-limieten met standaard RustCrypto-crates:
+- ML-DSA-44: compute-bound (>1.4M CU).
+- SLH-DSA-SHA2-128f: stack-bound (overflow).
+Directe on-chain PQ-verificatie in één instructie is dus niet haalbaar met deze implementaties.
+
+=== Opties voor M4-design ===
+1. Off-chain PQ-verificatie + on-chain commitment/hash (design-wijziging).
+2. Lichter/custom SBF-geoptimaliseerd PQ (kleinere frames, minder CU).
+3. SLH-DSA-SHA2-128s (small variant, sig 7856 B) testen — mogelijk kleiner footprint.
+4. Verificatie splitsen over meerdere tx's/instructies (complex).
+
+=== Infrastructuur (behouden in program + SDK) ===
+- Instructies: pq_benchmark(scheme), pq_write_data(offset, chunk) [obp-core].
+- SDK: pqBenchmarkIx(), pqWriteDataIx() [instructions.ts].
+- Script: sdk/scripts/pq-benchmark.ts (herbruikbaar voor toekomstige PQ-metingen).
+- Vector-gen: /tmp/pqvec (ml-dsa + slh-dsa, deterministische ML-DSA vanaf seed).

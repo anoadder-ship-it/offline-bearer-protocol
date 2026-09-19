@@ -25,3 +25,12 @@ anchor-spl = "1.1.2"
 # zelf al in de lock heeft (3.1.0) → type-unificatie, geen extra download.
 # Zelfde conventie als active-defense (solana-sha256-hasher = "3.1.0").
 solana-sha256-hasher = "3.1.0"
+
+# M4 (PQ, B8): FIPS 203 ML-DSA + FIPS 205 SLH-DSA verificatie (pure Rust, no_std).
+
+
+# M4 (PQ, B8): FIPS 203 ML-DSA-44 + FIPS 205 SLH-DSA-128f verificatie.
+# ml-dsa: default-features=false → géén getrandom/rand (SBF-onondersteund); alloc voor MaybeBox
+# (heap) zodat de grote A_hat-precompute niet het SBF-frame (4096 B) blaast.
+ml-dsa = { version = "0.1", default-features = false, features = ["alloc"] }
+slh-dsa = "=0.2.0-rc.5"

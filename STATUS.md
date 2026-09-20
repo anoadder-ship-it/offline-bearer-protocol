@@ -714,25 +714,27 @@ Trade-off: layout-wijziging vóór mainnet (nu nog gratis; devnet-state reset).
 sig 2420 B; pk 1312 B — kleinste FIPS-sig; device-verificatie ≈ ms).
 SLH-DSA (sig 7.8–17 KB) uit fase-1-scope; `sig_scheme=2` gereserveerd.
 
-### 13.4 Overlegpunten (D-serie)
+### 13.4 D-serie — BESLOTEN (2026-09-20)
 
-- **D1 (PQ-route):** Track 1 (optimistische validiteit) als fase-1-PQ-design,
-  Track 2 (C-port meting) parallel als upgrade-pad? (aanbeveling: ja)
-- **D2 (dispute-default):** validity-challenge → "stuck, not stolen" (waarde
-  blijft in vault, REJECTED na tweede window) vs. mint-authority-beslissing vs.
-  federatie? (aanbeveling: stuck-not-stolen + optionele authority-override)
-- **D3 (schema):** ML-DSA-44 (FIPS 203) als PQ-referentie; SLH-DSA uit scope?
-  (aanbeveling: ja)
-- **D4 (R2 sigCommit):** per-link signature-commitment in Submission
-  (+128 B)? (aanbeveling: ja — layout is nu nog gratis vóór mainnet)
-- **D5 (opruiming):** (a) M3-commit `417125a` pushen? (b) programma unificeren
-  op canoniek `5oUPUTu…` (M4-build daar deployen, SDK wijzen, `9D2fU2g…`
-  afvallen + documenteren)? (c) PQ-vectoren in `sdk/fixtures/pq/`
-  versioneren? (aanbeveling: alles ja)
-- **D6 (volgorde):** M4.1 = eerst Track 1 doorvoeren (SPEC + program + SDK +
-  matrix herdraaien met PQ-coin), dan Track 2-meting? (aanbeveling: ja)
-- Q6/Q7 (SpankWallet M2.5) blijven open — inplannen ná D-beslissingen (het
-  CoinFile-v2-formaat dat de wallet host is eerst vast).
+| # | Beslissing | Inhoud |
+|---|------------|--------|
+| D1 | PQ-route | Track 1 = fase-1-PQ-design (optimistische validiteit). Track 2 = parallel upgrade-pad (C-port ML-DSA-44 meting). |
+| D2 | Dispute-default | Validity-challenge → "stuck, not stolen": waarde blijft in vault; REJECTED na tweede window; bonds terug. Optionele mint-authority-override later, niet in MVP. |
+| D3 | Schema | ML-DSA-44 (FIPS 203) = PQ-referentie (`sig_scheme=1`). SLH-DSA uit fase-1-scope (`sig_scheme=2` gereserveerd). |
+| D4 | R2 sigCommit | Ja: per-link `sigCommit = H(sig)[0..32]` in Submission (+128 B). Layout nu, vóór mainnet. |
+| D5 | Opruiming | (a) M3-commit pushen. (b) Canoniek programma = `5oUPUTu…` voor Track 1; SDK daarop wijzen; `9D2fU2g…` documenteren als afgevallen. (c) PQ-vectoren in `sdk/fixtures/pq/` versioneren. |
+| D6 | Volgorde | Eerst M4.1 Track 1 (SPEC + program + SDK + matrix met PQ-coin); daarna Track 2-meting. |
+
+Q6/Q7 blijven open tot CoinFile v2 stabiel is.
+
+**Uitvoering & afwikkeling (M4.1, 2026-09-19/20):** D1/D3/D4/D6 uitgevoerd in
+§14 (Track 1 + sigCommit + ML-DSA-44; 14/14 matrix + 8/8 PQ-acceptatie).
+D5(a) ✓ (commits op GitHub), D5(c) ✓ (`sdk/fixtures/pq/` in repo). **D5(b) met
+bewijs-gebaseerde afwijking:** `5oUPUTu…`'s config (M1-éde-smoke) heeft een
+verloren `Keypair.generate()`-key (niet herstelbaar, ook niet via
+`close_instance`) → nieuw vers v2-instance `8M5ruFEh…` als canoniek
+(volledig vers + 14/14); `5oUPUTu…` en `9D2fU2g…` gedocumenteerd als
+historisch (details + bewijs: §14.2).
 
 
 ## 14. M4.1 — Track 1 (optimistische validiteit) + sigCommit + PQ-acceptatie (AFGEROND, 2026-09-19)

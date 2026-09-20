@@ -1,7 +1,8 @@
 import { PublicKey } from '@solana/web3.js';
 
 /** OBP-core programma (devnet, SBPF v3 — STATUS sectie 9.2). */
-export const PROGRAM_ID = new PublicKey('9D2fU2g13Y55uvk6kLiHRknxd6rzu84nsHy6gnjTLqzt');
+// M4.1: env-override (PQ-testinstance etc.); default = canoniek v2-proграмма.
+export const PROGRAM_ID = new PublicKey(process.env.OBP_PROGRAM_ID || '8M5ruFEhFfenHSkjsUcf2FaZFKKKamJEHWRCSfttNHi6');
 export const DEVNET_URL = 'https://api.devnet.solana.com';
 export const ED25519_PRECOMPILE_ID = new PublicKey('Ed25519SigVerify111111111111111111111111111');
 

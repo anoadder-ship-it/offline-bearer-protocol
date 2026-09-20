@@ -12,7 +12,7 @@ mod state;
 // Zelfde patroon als active-defense (gemeten in de bron, STATUS.md sectie 5).
 use instructions::*;
 
-declare_id!("9D2fU2g13Y55uvk6kLiHRknxd6rzu84nsHy6gnjTLqzt");
+declare_id!("8M5ruFEhFfenHSkjsUcf2FaZFKKKamJEHWRCSfttNHi6");
 
 #[program]
 pub mod obp_core {
@@ -86,6 +86,23 @@ pub mod obp_core {
         last_hash: [u8; 32],
     ) -> Result<()> {
         instructions::append_links(ctx, serial, head_owner, links, last_hash)
+    }
+
+    /// M4.1 (D5): admin — draineert de init-PDAs (her-init/retire).
+    pub fn close_instance(ctx: Context<CloseInstance>) -> Result<()> {
+        instructions::admin::close_instance(ctx)
+    }
+
+    /// Track 1 (R2): validity-check van een link-signatuur
+    /// (H(sig) == opgeslagen commitment; Ed25519: combineer met precompile).
+    pub fn verify_sig_commit<'info>(
+        ctx: Context<VerifySigCommit<'info>>,
+        serial: [u8; 32],
+        attempt: u8,
+        link_index: u16,
+        sig: [u8; 64],
+    ) -> Result<()> {
+        instructions::verify_sig_commit(ctx, serial, attempt, link_index, sig)
     }
 
     /// Finaliseer een submission (SPEC §5.6/§5.7): de dispute-game.

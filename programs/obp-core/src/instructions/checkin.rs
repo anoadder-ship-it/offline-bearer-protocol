@@ -63,6 +63,21 @@ fn pda_transfer<'a, 'b, 'c, 'info>(
     Ok(())
 }
 
+/// Track 1 (R2): signature-commitment = H(voorgestelde sig-bytes)[0..32].
+/// Scheme 0 (Ed25519): H over de volledige 64B-signatuur. Scheme 1 (PQ): de
+/// link draagt H(sig_volledig)[0..32] in sig[0..32] (SigCommitFormat); het
+/// programma slaat H(sig[0..32]) op = dubbel-hash, consistent voor beide
+/// schemes; de binding aan de volledige 2420B-sig wordt bij de challenge
+/// gecontroleerd (Track 2: in-program check H(sig_volledig) == commitment).
+/// `#[inline(never)]`: sha256-inlining blaast de SBF-frame-limit (M1-les).
+#[inline(never)]
+fn sig_commit_hash(sig: &[u8; 64]) -> [u8; 32] {
+    let h = solana_sha256_hasher::hashv(&[sig.as_slice()]);
+    let mut out = [0u8; 32];
+    out.copy_from_slice(&h.to_bytes());
+    out
+}
+
 /// Reference naar de laatste state (geen kopie op de stack — SBF-frame
 /// bezorgen; de SBF-frame-limit is 4096 B/function, gemeten M1).
 fn last_state(sub: &Submission) -> &[u8; STATE_SIZE] {
@@ -110,7 +125,7 @@ fn verify_full_chain(sub: &Submission, registry: &MintRegistry) -> Result<()> {
 #[derive(Accounts)]
 #[instruction(serial: [u8; 32], attempt: u8)]
 pub struct StartCheckIn<'info> {
-    #[account(constraint = config.sig_scheme == 0 @ ObpError::StatusInvalid)]
+    #[account(constraint = config.sig_scheme <= 1 @ ObpError::SigSchemeUnsupported)]
     pub config: Account<'info, Config>,
     #[account(
         mut,
@@ -222,7 +237,7 @@ pub fn start_check_in<'info>(
 #[derive(Accounts)]
 #[instruction(serial: [u8; 32])]
 pub struct AppendLinks<'info> {
-    #[account(constraint = config.sig_scheme == 0 @ ObpError::StatusInvalid)]
+    #[account(constraint = config.sig_scheme <= 1 @ ObpError::SigSchemeUnsupported)]
     pub config: Account<'info, Config>,
     #[account(
         seeds = [b"mint", serial.as_ref()],
@@ -288,6 +303,21 @@ pub fn append_links<'info>(
         );
         // Signatuur: zie de ed25519-precompile in deze tx (offsets naar
         // deze instruction-data; `link.sig` wordt hier dus niet gelezen).
+        // Track 1 (R2): signature-commitment on-chain opslaan.
+        // Scheme 0 (Ed25519): commitment = H(64B sig); de precompile doet de
+        // cryptografische check in deze tx (2400 CU). Scheme 1 (PQ): de
+        // 2420B-signatuur past niet in de ix-data (1232B tx-limiet); de link
+        // draagt de commitment in sig[0..32] (sig[32..64] moet nul zijn) en
+        // de volledige sig ligt in een data-account (pq_write_data-chunks).
+        if config.sig_scheme == 1 {
+            // slice-comparatie i.p.v. iterator: .iter().all() inline een
+            // 4160B-frame (64B over de 4096B SBF-limit, gemeten M4/Track1).
+            require!(
+                link.sig[32..] == [0u8; 32],
+                ObpError::SigCommitFormat
+            );
+        }
+        submission.sig_commits[base + i] = sig_commit_hash(&link.sig);
         submission.states[base + i] = *st;
         prev = *st;
     }
@@ -460,7 +490,7 @@ fn write_allowance(info: &AccountInfo, a: &Allowance) -> Result<()> {
 #[derive(Accounts)]
 #[instruction(serial: [u8; 32], other_attempt: u8, recipient: Pubkey)]
 pub struct FinalizeCheckIn<'info> {
-    #[account(mut, constraint = config.sig_scheme == 0 @ ObpError::StatusInvalid)]
+    #[account(mut, constraint = config.sig_scheme <= 1 @ ObpError::SigSchemeUnsupported)]
     pub config: Account<'info, Config>,
     #[account(
         mut,
@@ -868,13 +898,68 @@ fn fin_resolve_lose<'a>(
 }
 
 // ---------------------------------------------------------------------------
+// verify_sig_commit (Track 1, R2) — validity-check van één link-signatuur
+// ---------------------------------------------------------------------------
+//
+// Iedereen kan voor een opgeslagen link van een submission de bijbehorende
+// signatuur voorleggen; het programma dwingt de binding af:
+// H(sig) == sig_commits[link_index]. Scheme 0 (Ed25519): combineer met de
+// ed25519-precompile in dezelfde tx (signatuur over H(states[link_index]),
+// tekenaar = owner(states[link_index-1]) — beide on-chain afleesbaar) →
+// volledige on-chain validity-resolutie. Scheme 1 (PQ): dit is de
+// binding-check; de cryptografische PQ-check komt met Track 2 (upgrade van
+// dezelfde instructie — geen state-migratie, R2).
+
+#[derive(Accounts)]
+#[instruction(serial: [u8; 32], attempt: u8, link_index: u16)]
+pub struct VerifySigCommit<'info> {
+    #[account(constraint = config.sig_scheme <= 1 @ ObpError::SigSchemeUnsupported)]
+    pub config: Account<'info, Config>,
+    #[account(
+        seeds = [b"submission", serial.as_ref(), &attempt.to_be_bytes()],
+        bump = submission.bump,
+    )]
+    pub submission: Account<'info, Submission>,
+}
+
+/// `#[inline(never)]`: handler-frame (M1-les: SBF 4096 B/functie).
+#[inline(never)]
+pub fn verify_sig_commit<'info>(
+    ctx: Context<VerifySigCommit<'info>>,
+    serial: [u8; 32],
+    attempt: u8,
+    link_index: u16,
+    sig: [u8; 64],
+) -> Result<()> {
+    let submission = &ctx.accounts.submission;
+    // serial/attempt: seeds-check doet het adres; de velden controleren we
+    // zelf (codebase-stijl: handler-checks, M1-frame-limit-les).
+    require!(submission.serial == serial, ObpError::SubmissionMismatch);
+    require!(submission.attempt == attempt, ObpError::SubmissionMismatch);
+    let n = submission.states_len as usize;
+    let idx = link_index as usize;
+    // link_index ≥ 1: states[0] = genesis heeft geen signatuur. (expr-fragment
+    // in require! haakt op kale `<` — M1-codebase gebruikt <= / >=, zelfde stijl.)
+    require!(idx >= 1 && idx + 1 <= n, ObpError::StatusInvalid);
+    let stored = &submission.sig_commits[idx];
+    let h = sig_commit_hash(&sig);
+    require!(&h == stored, ObpError::SigCommitMismatch);
+    msg!(
+        "obp-core verify_sig_commit: link {} — commit-match (scheme {})",
+        link_index,
+        ctx.accounts.config.sig_scheme
+    );
+    Ok(())
+}
+
+// ---------------------------------------------------------------------------
 // settle (SPEC §5.8) — na de window: uitbetaling van de ongedisputeerde head
 // ---------------------------------------------------------------------------
 
 #[derive(Accounts)]
 #[instruction(serial: [u8; 32], other_attempt: u8, recipient: Pubkey)]
 pub struct Settle<'info> {
-    #[account(mut, constraint = config.sig_scheme == 0 @ ObpError::StatusInvalid)]
+    #[account(mut, constraint = config.sig_scheme <= 1 @ ObpError::SigSchemeUnsupported)]
     pub config: Account<'info, Config>,
     #[account(
         mut,
@@ -1096,4 +1181,33 @@ fn settle_pay_out<'a>(
         bond
     );
     Ok(())
+}
+
+#[cfg(test)]
+mod track1_tests {
+    use super::*;
+
+    /// R2-regressie: sig_commit_hash = sha256 over de ruwe sig-bytes.
+    /// Bekende vector (python hashlib geverifieerd): sha256(64x0xAB).
+    #[test]
+    fn sig_commit_hash_known_vector() {
+        let sig = [0xABu8; 64];
+        let h = sig_commit_hash(&sig);
+        let expected = [
+            0xec, 0x65, 0xc8, 0x79, 0x8e, 0xcf, 0x95, 0x90,
+            0x24, 0x13, 0xc4, 0x0f, 0x7b, 0x9e, 0x6d, 0x4b,
+            0x00, 0x68, 0x88, 0x5f, 0x5f, 0x32, 0x4a, 0xba,
+            0x1f, 0x9b, 0xa1, 0xc8, 0xe1, 0x4a, 0xea, 0x61,
+        ];
+        // Pinned vector (onafhankelijk berekend met python hashlib.sha256).
+        assert_eq!(&h, &expected, "sha256(64x0xAB) verandert niet");
+    }
+
+    #[test]
+    fn sig_commit_hash_differs_per_sig() {
+        let a = [1u8; 64];
+        let mut b = [1u8; 64];
+        b[63] = 2;
+        assert_ne!(sig_commit_hash(&a), sig_commit_hash(&b));
+    }
 }

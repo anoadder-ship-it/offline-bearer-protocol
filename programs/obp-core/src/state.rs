@@ -153,12 +153,20 @@ pub struct Submission {
     pub states_len: u16,
     /// De volledige chain: states[0]=state_0, states[1..]=link-states.
     pub states: [[u8; 104]; MAX_SUBMISSION_STATES],
+    /// Track 1 (R2, 2026-09-19): per-link signature-commitments —
+    /// `sig_commits[i] = H(sig_i)[0..32]` voor de signatuur op states[i]
+    /// (i ≥ 1; index 0 = genesis, onbruikbaar → nul). Scheme 0: H(64B sig);
+    /// scheme 1 (PQ): H(2420B sig), de commitment is de eerste 32 B van de
+    /// link-sig (volledige sig via data-account, §13.3 R2). Binde de on-chain
+    /// states aan de offline-signaturen → deterministische dispute-check.
+    pub sig_commits: [[u8; 32]; MAX_SUBMISSION_STATES],
     pub bump: u8,
 }
 
 impl Submission {
-    pub const LEN: usize =
-        8 + 32 + 1 + 32 + 32 + 2 + 8 + 8 + 1 + 2 + 1 + (STATE_SIZE * MAX_SUBMISSION_STATES);
+    pub const LEN: usize = 8 + 32 + 1 + 32 + 32 + 2 + 8 + 8 + 1 + 2 + 1
+        + (STATE_SIZE * MAX_SUBMISSION_STATES)
+        + (32 * MAX_SUBMISSION_STATES);
 }
 
 /// Per-wallet offline-toelating (B6: mint-gate, I5).

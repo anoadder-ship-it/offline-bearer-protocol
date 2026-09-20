@@ -11,7 +11,8 @@
     "@noble/curves": "^1.9.7",
     "@noble/hashes": "^1.8.0",
     "@solana/spl-token": "^0.4.15",
-    "@solana/web3.js": "^1.99.0"
+    "@solana/web3.js": "^1.99.0",
+    "mldsa-wasm": "^0.0.4"
   },
   "devDependencies": {
     "@types/node": "^26.6.1",

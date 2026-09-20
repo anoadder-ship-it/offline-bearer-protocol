@@ -733,3 +733,87 @@ SLH-DSA (sig 7.8–17 KB) uit fase-1-scope; `sig_scheme=2` gereserveerd.
   matrix herdraaien met PQ-coin), dan Track 2-meting? (aanbeveling: ja)
 - Q6/Q7 (SpankWallet M2.5) blijven open — inplannen ná D-beslissingen (het
   CoinFile-v2-formaat dat de wallet host is eerst vast).
+
+
+## 14. M4.1 — Track 1 (optimistische validiteit) + sigCommit + PQ-acceptatie (AFGEROND, 2026-09-19)
+
+### 14.1 Resultaat (bewijs)
+
+- **Program (Track 1):** `Submission.sig_commits` (128 B = MAX×32, `sig_commits[i] =
+  H(sig_field)` — scheme 0: H(64B ed25519-sig); scheme 1: H(commitment-veld),
+  commitment = [H(ML-DSA-sig)[0..32] ‖ 0^32]) + `verify_sig_commit`-instructie
+  (CU 4396) + `close_instance` (admin; mint-authority + upgrade-authority) +
+  `SigCommitFormat(6025)`/`SigCommitMismatch(6026)`. Tests 7/7 (unit), e_flags v3.
+- **Regressie:** E2E-matrix **14/14 PASS (102.4 s)** op het nieuwe canonieke
+  v2-instance — bewijs: `sdk/evidence/m41-matrix-14of14-v2instance.log`.
+- **PQ-acceptatie:** **8/8 PASS (17.4 s)** op PQ-testinstance (scheme 1):
+  ML-DSA-44-coin (2× 2420 B), offline bearer-verify (hashketen + signaturen +
+  negatief), mint→start→append (commitments, géén precompile; CU 7733/2 links)→
+  finalize→settle (WON/SPENT), `verify_sig_commit` pos + neg (6026) —
+  bewijs: `sdk/evidence/m41-pq-acceptance-8of8.log`.
+- **ML-DSA JS:** `mldsa-wasm@0.0.4` (zero-dep, WASM) in de SDK; cross-gevalideerd
+  tegen de RustCrypto-vectors uit `sdk/fixtures/pq/vectors.txt` (verify=true,
+  corrupt-sig=false, wrong-msg=false, roundtrip 2420 B, ~10 ms/verify).
+  Kenmerk (gedocumenteerd): sign is **niet-deterministisch** (mu/tr per FIPS 203)
+  → commitment op de exacte sig-bytes is geluid (zelfde semantic als Ed25519).
+
+### 14.2 Beslissingen & afwijkingen
+
+- **Afwijking D5(b) (bewijs-gebaseerd):** `5oUPUTu…` kon niet het actieve
+  canonieke instance worden: zijn config (09-15, M1-éde-smoke) heeft een
+  mint_authority (`5TrXx…`) die afkomstig is van `Keypair.generate()` in de
+  oorspronkelijke `tests/smoke-m1.ts` — een **niet-gespaarde willekeurige key**
+  (verloren; nergens in repo/repo-historie/`.config` te vinden). `close_instance`
+  is bruikbaar voor *toekomstige* instances, maar sluit deze config niet.
+  → **Nieuw canoniek v2-instance:** `8M5ruFEhFfenHSkjsUcf2FaZFKKKamJEHWRCSfttNHi6`
+  (volledig vers; config met deterministische keys; 14/14).
+  §4-conventie vol: keypair in `~/.config/offline-bearer-protocol/program-keypairs/
+  obp-core-v2-keypair.json` (600) + byte-identieke backup
+  ((backup buiten de repo; locatie niet gepubliceerd), incl. seed-hex, 600).
+  `5oUPUTu…` + `9D2fU2g…` = historische devnet-instances (M3-bewijs blijft geldig;
+  9D2fU2g draait de Track 1-build met 3 on-gesloten M3-coins — acceptabel, devnet).
+- **PQ-testinstance:** `6YLEj7ywUALhoUS5uNFkdp8docvyoEgYQ2ZoqF1GfgVF`
+  (afgeleide keypair + backups, zelfde conventie; declare_id = compile-time →
+  afzonderlijke build/deploy per program-ID; canonieke .so is hersteld in target/).
+- **E0 in de matrix:** idempotent-setup (vault-mint + init) — alleen bij een
+  config-loos instance; maakt de matrix zelfopstartend op elk nieuw instance
+  (`OBP_SIG_SCHEME` env: 0 default / 1 PQ; `OBP_PROGRAM_ID` env in constants.ts).
+
+### 14.3 Bevindingen (alles gemeten, deze sessie)
+
+- **Rust-constante arrays bepalen de offset:** `sig_commits` zit op vaste offset
+  `126 + MAX×104` (niet `126 + states_len×104`) — de eerste reader-poging las
+  state-slot 3 (nul) en "ontdekte" zo lege commits terwijl `verify_sig_commit`
+  (programmakant, correcte offset) groen was. Reader is nu robuust:
+  sigCommits = laatste 128 B vóór de bump.
+- **`start_check_in` executeert Anchor-init (system Allocate/Assign) vóór de
+  handler-checks:** start op een bestaande submission faalt met system
+  `Custom(0)` (Allocate: already in use) óf `Custom(1)` (insufficient funds bij
+  bond-transfer, token-program) — *vóór* de 6015/6006-checks. E4 (double-spend)
+  vereist daarom een SPENT-registry met een **vrije** attempt (s8 na E8b);
+  E5 (herstart) blokkeert defensief op de init-laag (code 0 — gedocumenteerd).
+- **E8a (WindowExpired) is op devnet een slot-race:** window = 10 slots ≈ 4 s;
+  de settle-verwerking (slot-telling programmakant) kan ná de deadline vallen
+  door RPC-latency/429. Deterministisch onderscheid in de matrix: 6019 = check
+  zelf; succes + verwerkt-slot ≥ deadline = timing-artifact (met slot-bewijs);
+  succes + verwerkt-slot < deadline = echte bug. (M3-14/14 bewees de 6019-path;
+  deze sessie: beide outcoms waargenomen, altijd met bewijs.)
+- **`set_allowance` heeft géén `init_if_needed`** (M1-design: allowance ontstaat
+  bij de eerste mint) → E0.5 munt eerst een coin. TODO M4.1.1: overwegen.
+- **ATA's moeten pré-existeren vóór finalize/settle** (M3-bevinding, hier
+  herbevestigd: fee-sink-ATA ontbrak op het verse instance → 6021; E0 garandeert
+  nu vault+fee ATA's onvoorwaardelijk).
+
+### 14.4 Over naar M4.1.1
+
+- **Track 2 (C-port):** ML-DSA-verify met RustCrypto (of silence-labs) in SBF —
+  CU-meting op **local validator** (devnet 200k-cap is cluster-artifact). Data-
+  account chunks (`pq_write_data`) staan al. Succes → optionele "verified
+  check-in" voor high-value coins (upgrade, géén state-migratie).
+- **SDK-PQ:** `verifyCoinChain` scheme-1-bewust maken (mldsa-wasm staat al in
+  `sdk/`); `Signer`-interface is sync — PQ-sign is async (script bouwt de coin
+  handmatig via layout-helpers; M4.1.1: async `Signer`-variant).
+- **close_instance** gebruiken bij toekomstig instance-ruimwerk (incl. de 3
+  on-gesloten coins op 9D2fU2g — aldaar wel sluitbaar: upgrade-authority =
+  wallet G1qg, mint-authority = 23bxK (deterministisch, bekend)).
+- D2 (dispute-default) / Q6–Q7 (SpankWallet) blijven open — onbeïnvloed door M4.1.

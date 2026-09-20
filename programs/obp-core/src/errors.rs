@@ -50,4 +50,12 @@ pub enum ObpError {
     OwnerAnchorMismatch,
     #[msg("last_hash does not match the hash of the final submitted state")]
     LastHashMismatch,
+    #[msg("sig_scheme not supported (0 = Ed25519, 1 = PQ-optimistic; 2 = gereserveerd)")]
+    SigSchemeUnsupported,
+    #[msg("PQ link-sig: bytes 32..64 moeten nul zijn (sig[0..32] = commitment)")]
+    SigCommitFormat,
+    #[msg("voorgestelde signature hash-match niet met de opgeslagen commitment")]
+    SigCommitMismatch,
+    #[msg("alleen de mint-authority mag deze operatie uitvoeren")]
+    NotMintAuthority,
 }

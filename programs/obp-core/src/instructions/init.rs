@@ -10,6 +10,9 @@ pub struct InitArgs {
     pub challenge_window_slots: u64,
     pub max_links_per_tx: u16,
     pub default_allowance: u64,
+    /// Track 1 (2026-09-19): 0 = Ed25519, 1 = PQ-optimistisch (B8: per
+    /// programma-config, niet per munt; was M1-hardcoded 0).
+    pub sig_scheme: u8,
 }
 
 #[derive(Accounts)]
@@ -57,6 +60,7 @@ pub fn init<'info>(ctx: Context<Init<'info>>, args: InitArgs) -> Result<()> {
         ObpError::WindowTooSmall
     );
     require!(args.max_links_per_tx >= 1, ObpError::MaxLinksTooSmall);
+    require!(args.sig_scheme <= 1, ObpError::SigSchemeUnsupported);
 
     let config = &mut ctx.accounts.config;
     config.mint_authority = ctx.accounts.mint_authority.key();
@@ -66,7 +70,7 @@ pub fn init<'info>(ctx: Context<Init<'info>>, args: InitArgs) -> Result<()> {
     config.max_links_per_tx = args.max_links_per_tx;
     config.default_allowance = args.default_allowance;
     config.total_unspent_supply = 0;
-    config.sig_scheme = 0; // M1: Ed25519 (B5/B8)
+    config.sig_scheme = args.sig_scheme; // B8: per programma-config (Track 1: parameter)
     // PDA-bumps opslaan: latere instructies derivaten deze PDA's met
     // `bump = <account>.bump` (o.a. vault_pda.bump voor token-account-ownership).
     config.bump = ctx.bumps.config;
@@ -74,12 +78,13 @@ pub fn init<'info>(ctx: Context<Init<'info>>, args: InitArgs) -> Result<()> {
     ctx.accounts.fee_pda.bump = ctx.bumps.fee_pda;
 
     msg!(
-        "obp-core init: mint_authority={}, vault_mint={}, bond_bps={}, window_slots={}, max_links_per_tx={}",
+        "obp-core init: mint_authority={}, vault_mint={}, bond_bps={}, window_slots={}, max_links_per_tx={}, sig_scheme={}",
         config.mint_authority,
         config.vault_mint,
         config.bond_multiplier_bps,
         config.challenge_window_slots,
-        config.max_links_per_tx
+        config.max_links_per_tx,
+        config.sig_scheme
     );
     Ok(())
 }

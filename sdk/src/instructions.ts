@@ -28,10 +28,21 @@ export function ixData(name: string, args?: Buffer): Buffer {
 export function initIx(
   vaultMint: PublicKey, bondMultiplierBps: number, challengeWindowSlots: bigint,
   maxLinksPerTx: number, defaultAllowance: bigint, mintAuthority: PublicKey, payer: PublicKey,
+  sigScheme = 0, // Track 1: 0 = Ed25519, 1 = PQ-optimistisch (B8: per programma-config)
 ): TransactionInstruction {
   const [cfg] = configPda(); const [vp] = vaultPda(); const [fp] = feePda();
-  const args = Buffer.concat([pk(vaultMint), u32le(bondMultiplierBps), u64le(challengeWindowSlots), u16le(maxLinksPerTx), u64le(defaultAllowance)]);
+  const args = Buffer.concat([pk(vaultMint), u32le(bondMultiplierBps), u64le(challengeWindowSlots), u16le(maxLinksPerTx), u64le(defaultAllowance), u8b(sigScheme)]);
   return new TransactionInstruction({ programId: PROGRAM_ID, keys: [w(cfg, true), w(vp, true), w(fp, true), s(mintAuthority), s(payer, true), w(SYS)], data: ixData('init', args) });
+}
+
+// Track 1 (R2): validity-check van een link-signatuur: H(sig) == sig_commits[linkIndex].
+// Scheme 0: combineer met ed25519VerifyIx in dezelfde tx voor volledige on-chain-resolutie.
+export function verifySigCommitIx(
+  serial: Buffer, attempt: number, linkIndex: number, sig: Buffer,
+  submission: PublicKey, config: PublicKey,
+): TransactionInstruction {
+  const args = Buffer.concat([serial, u8b(attempt), u16le(linkIndex), sig]);
+  return new TransactionInstruction({ programId: PROGRAM_ID, keys: [w(config), w(submission)], data: ixData('verify_sig_commit', args) });
 }
 
 export function pingIx(): TransactionInstruction {

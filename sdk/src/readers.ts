@@ -89,7 +89,8 @@ export interface OnChainSubmission {
   status: number;              // @123 (u8)
   statesLen: number;           // @124 (u16)
   states: Buffer[];            // @126 (MAX 8 × 104)
-  bump: number;                // @958
+  sigCommits: Buffer[];        // @126+n×104 (Track 1: 10 × 32 B; [] op oude accounts)
+  bump: number;                // laatste byte
 }
 export function parseSubmission(d: Buffer): OnChainSubmission {
   const n = d.readUInt16LE(124);
@@ -106,7 +107,20 @@ export function parseSubmission(d: Buffer): OnChainSubmission {
     status: d.readUInt8(123),
     statesLen: n,
     states,
-    // bump = laatste byte (robust voor MAX_SUBMISSION_STATES; M1: MAX=4 → LEN=543)
+    // M4.1 (Track 1): sigCommits = 128 B (10 × 32) ná de states; robuust:
+    // alleen parsen als de account het veld bevat (oude M1-accounts LEN=543 niet).
+    sigCommits: (() => {
+      // Rust-layout: states is een VAST-array (MAX×104), sig_commits (MAX×32)
+      // volgt daarna — dus sigCommits = laatste 128 B vóór de bump (robust).
+      const off = d.length - 128 - 1;
+      if (off < 126) return [];
+      const max = (off - 126) / 104; // MAX_SUBMISSION_STATES (4)
+      const cnt = Math.min(10, max);
+      const out: Buffer[] = [];
+      for (let i = 0; i < cnt; i++) out.push(Buffer.from(d.subarray(off + i * 32, off + (i + 1) * 32)));
+      return out;
+    })(),
+    // bump = laatste byte (robust voor MAX_SUBMISSION_STATES)
     bump: d.readUInt8(d.length - 1),
   };
 }

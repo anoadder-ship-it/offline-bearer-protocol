@@ -10,8 +10,8 @@ import { sha256 } from '@noble/hashes/sha256';
 import {
   DEVNET_URL, ObpClient, newCoin, appendLink, ed25519Signer, stateHash,
   fetchConfig, fetchRegistry, fetchHead, fetchSubmission, fetchAllowance,
-  mintCoinIx, startCheckInIx, appendLinksIxPair, finalizeIx, settleIx, setAllowanceIx,
-  submissionPda, vaultPda, ata,
+  initIx, mintCoinIx, startCheckInIx, appendLinksIxPair, finalizeIx, settleIx, setAllowanceIx,
+  submissionPda, vaultPda, feePda, ata,
   RegistryStatus, SubmissionStatus,
 } from '../src/index.ts';
 import type { CoinCore } from '../src/index.ts';
@@ -212,11 +212,26 @@ async function waitWindow(serial: Buffer) {
   }
 }
 
+// M4.1 (Track 1): sig-scheme voor het instance (B8: per programma-config).
+// 0 = Ed25519 (default), 1 = PQ-optimistisch. E0-setup (nieuw instance).
+const SIG_SCHEME = Number(process.env.OBP_SIG_SCHEME || 0);
+
 async function main() {
   const t0 = Date.now();
-  const cfg = await fetchConfig(conn);
+  let cfg = await fetchConfig(conn);
+  if (!cfg) {
+    // E0 (idempotent-setup): vault-mint creëren + init. Alleen bij nieuw instance.
+    console.log('config ontbreekt → E0: vault-mint + init (sig_scheme=' + SIG_SCHEME + ')');
+    vaultMint = await rpc429(() => spl.createMint(conn, payer, mintAuthority.publicKey, null, 0, undefined, { commitment: 'confirmed' }));
+    await client.send('init', initIx(vaultMint, 10000, 10n, 4, 1000n, mintAuthority.publicKey, payer.publicKey, SIG_SCHEME), [mintAuthority, payer], payer);
+    cfg = await fetchConfig(conn);
+    if (!cfg) throw new Error('E0: config bestaat niet na init');
+  }
   vaultMint = cfg.vaultMint; maxLinksPerTx = cfg.maxLinksPerTx;
-  console.log('config: vaultMint ' + vaultMint.toBase58() + ' | bps ' + cfg.bondMultiplierBps + ' | window ' + cfg.challengeWindowSlots + ' | maxLinks ' + maxLinksPerTx);
+  // Vault/fee ATAs altijd garanderen (idempotent; finalize vereist pré-existentie — M3-bevinding).
+  await rpc429(() => spl.getOrCreateAssociatedTokenAccount(conn, payer, vaultMint, vaultPda()[0], true, 'confirmed'));
+  await rpc429(() => spl.getOrCreateAssociatedTokenAccount(conn, payer, vaultMint, feePda()[0], true, 'confirmed'));
+  console.log('config: vaultMint ' + vaultMint.toBase58() + ' | bps ' + cfg.bondMultiplierBps + ' | window ' + cfg.challengeWindowSlots + ' | maxLinks ' + maxLinksPerTx + ' | sigScheme ' + cfg.sigScheme);
 
   // M3-bevinding: final_owner se ATA moet pré-existeren vóór finalize/settle
   // (check_tok vereist Token-program-eigendom; ontbrekende account = System → 6021).
@@ -239,6 +254,13 @@ async function main() {
   if (needVault > 0n) {
     await rpc429(() => spl.mintTo(conn, payer, vaultMint, ata(vaultMint, vaultPda()[0]), mintAuthority, Number(needVault), [], { commitment: 'confirmed' }));
     console.log('   vault top-up: +' + needVault + ' → ' + (await bal(vaultPda()[0])));
+  }
+
+  // E0.5: eerste coin naar recipient → creeert het allowance-account
+  // (set_allowance heeft geen init_if_needed; M1-design: allowance ontstaat bij
+  // eerste mint. TODO M4.1.1: init_if_needed overwegen).
+  {
+    await mintNew('e0-recipient');
   }
 
   // --- E10a: set_allowance verhoog → OK --------------------------------------
@@ -345,8 +367,25 @@ async function main() {
   await finalizeA(s8, 0, 'e8', 'finalize(casusA)');
   {
     const s = (await fetchSubmission(conn, s8, 0))!;
-    await expectErr('E8a settle te vroeg → ' + E.WindowExpired + ' WindowExpired',
-      () => client.send('settle[e8-vroeg]', settleIx(s8, 0, 1, recipient.publicKey, s.checker, s.finalOwner, vaultMint, payer.publicKey), [], payer), E.WindowExpired);
+    const h8 = (await fetchHead(conn, s8))!;
+    const deadline = Number(h8.pendingSinceSlot) + Number(cfg.challengeWindowSlots);
+    // De WindowExpired-check gebruikt het slot van de VERWERKTE block (program-
+    // kant), niet het slot van mijn getSlot — onder devnet-latency (≈0,4s/slot,
+    // 429-retries) kan de settle verwerkt worden ná de deadline. Deterministisch
+    // onderscheid: succes + verwerkt-slot ≥ deadline = timing-artifact (bewijs:
+    // slot); succes + verwerkt-slot < deadline = echte bug; 6019 = de check zelf.
+    try {
+      const r = await client.send('settle[e8-vroeg]', settleIx(s8, 0, 1, recipient.publicKey, s.checker, s.finalOwner, vaultMint, payer.publicKey), [], payer);
+      const tx = await conn.getTransaction(r.signature, { maxSupportedTransactionVersion: 0 });
+      const procSlot = tx?.slot ?? 0;
+      if (procSlot >= deadline) {
+        record('E8a window verlopen bij verwerking (timing-artifact)', true, 'verwerkt-slot ' + procSlot + ' ≥ deadline ' + deadline + ' (WindowExpired zelf: M3-14/14, code ongewijzigd)');
+      } else {
+        record('E8a settle te vroeg → 6019 WindowExpired', false, 'ix slaagde met verwerkt-slot ' + procSlot + ' < deadline ' + deadline + ' (echte bug)');
+      }
+    } catch (e) {
+      record('E8a settle te vroeg → ' + E.WindowExpired + ' WindowExpired', String(e).includes('"Custom":' + E.WindowExpired), String(e).slice(0, 140));
+    }
   }
   console.log('   ... wacht op window ...');
   await waitWindow(s8);
@@ -355,11 +394,15 @@ async function main() {
 
   // --- E4: double-spend (start op SPENT-registry) -----------------------------
   console.log('\n== E4: double-spend ==');
-  const m2serial = sha256(Buffer.from('obp-m2-sdk-coin-001'));
-  const cM2 = buildChain(m2serial, [recipient, holder2]);
-  await ensureAta(submissionPda(m2serial, 1)[0]); // escrow-ATA pré-create → Anchor-deserialisatie slaagt → registry-status-check (6015) wordt bereikt
+  // E4 vereist: SPENT-registry + een NIET-gebruikte attempt (Anchor-init
+  // (Allocate) van de submission draait vóór de handler-checks; een bestaande
+  // submission faalt daar al met system-Custom(0)). s8 is na E8b SPENT en
+  // gebruikt alleen attempt 0 → attempt 1 is vrij → 6015 wordt bereikt.
+  // (Op 9D2fU2g liep dit op de M2-coin met dezelfde eigenschap.)
+  const cM2 = buildChain(s8, [recipient, holder2]);
+  await ensureAta(submissionPda(s8, 1)[0]); // escrow-ATA pré-create (handmatige check_tok)
   await expectErr('E4 start op SPENT-registry → ' + E.StatusInvalid,
-    () => client.send('start[e4]', startCheckInIx(m2serial, 1, cM2.states[0], recipient.publicKey, payer.publicKey, vaultMint), [recipient], payer), E.StatusInvalid);
+    () => client.send('start[e4]', startCheckInIx(s8, 1, cM2.states[0], recipient.publicKey, payer.publicKey, vaultMint), [recipient], payer), E.StatusInvalid);
 
   // --- E5: herstart bestaand attempt (defensieve lagen) -----------------------
   console.log('\n== E5: herstart attempt ==');

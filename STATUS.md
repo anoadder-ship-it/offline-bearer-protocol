@@ -819,3 +819,85 @@ historisch (details + bewijs: §14.2).
   on-gesloten coins op 9D2fU2g — aldaar wel sluitbaar: upgrade-authority =
   wallet G1qg, mint-authority = 23bxK (deterministisch, bekend)).
 - D2 (dispute-default) / Q6–Q7 (SpankWallet) blijven open — onbeïnvloed door M4.1.
+
+
+## 15. M4.1.1 — Track 2-meting (local validator) + system-encoding-les + Pinocchio-beoordeling (2026-09-20)
+
+### 15.1 Track 2: ML-DSA-44 in-program — gemeten resultaat (v1)
+
+**Instelling:** native agave test-validator 4.1.2 (aarch64; `<agave-checkout>/bin/`),
+canonieke .so deployed als `8M5ruFEh…`, data-account 3770 B
+(`pk_len‖pk‖msg_len‖msg‖sig` via `pq_write_data`, 1000 B-chunks),
+`pq_benchmark(scheme=1)` met `setComputeUnitLimit(1.4M)`.
+Script: `sdk/scripts/track2-cu-benchmark.ts`. Bewijs:
+`sdk/evidence/m411-track2-ml-dsa-cu-local-validator.log`.
+
+| meet | resultaat |
+|---|---|
+| ML-DSA-44 verify (RustCrypto `ml-dsa` 0.1), positief | **consumed 1.399.850 / 1.399.850 CU → "exceeded CUs meter"** (1.4M = per-instructielimiet) |
+| ML-DSA-44 verify, negatief (corrupte sig) | idem (de zware werk ligt vóór de eindvergelijking) |
+
+**Conclusie (bewijs-gebaseerd, vervangt de §13.3-hypothese):** met de huidige
+implementatie past ééne ML-DSA-44-verificatie **niet** in één instructie
+(≥1.4M CU; de F204-devnet-meting "exceeded 1.4M" bevestigt dit, local
+validator maakt het exact: het plafond zelf). Track 1 blijft het fase-1-PQ-
+design (D1). **Upgrade-pad Track 2 (M4.2):** een geoptimaliseerde
+implementatie die ≤ ~1.2M CU kost (RustCrypto 0.1 is correctheid-georiënteerd,
+niet performance-getuned; opties: hand-geoptimaliseerde SBF-port, SilenceLabs-
+core, of PQClean-afgeleide) — pas dan is "verified check-in" voor high-value
+coins haalbaar.
+
+### 15.2 Systeem-encoding-les (agave 4.x + web3.js 1.99) — met bewijs
+
+**Voorval:** `SystemProgram.createAccount({programId: PROG})` maakte een account
+met juiste lamports+space maar **owner = system** → `pq_write_data` faalde met
+"modified data of an account it does not own".
+
+**Root cause (gemeten, niet gegokt):**
+- web3.js 1.99 encodeert het **nieuwe** system-instructieformaat: u32 LE
+  discriminators. `Create` = index 0: `[00000000][lamports u64][space u64][owner 32B]`
+  (gecontroleerde bytes: `00000000|e0f89d01…|ba0e0000…|6d26eb98…` = PROG).
+- Op agave 4.1.2 (local) én devnet (nu **4.3.0-rc.0**) creëert index 0 een
+  **system-owned** account (owner-veld niet toegepast); `Assign` = index 1:
+  `[01000000][owner 32B]` zet de owner. **create+assign in één tx → owner=PROG
+  (gemeten: MATCH).**
+- Bijkomend gemeten: "Simulation failed" met lege message = 1.000.000 lamports
+  < rent-exempt minimum voor 64 B (≈1.14M) — `getMinimumBalanceForRentExemption`
+  altijd gebruiken.
+- web3.js 1.99 quirk (gedocumenteerd): `simulateTransaction(Buffer, config)`
+  crasht intern (expecteert message-object); `simulateTransaction(tx, optsObj)`
+  gooit "Invalid arguments" (2e arg = signers-array).
+- SDK-helft (les als code): `createProgramOwnedAccountIx()` in `src/accounts.ts`
+  (create+assign-paar). Alle matrix/E0-routes gebruiken token-program-CPI
+  (owner door het token-program) → waren níet getroffen.
+
+### 15.3 Pinocchio-beoordeling (onderzoek, 2026-09-20)
+
+**Feiten (brongeverifieerd):** `pinocchio` = zero-dependency, `no_std`,
+zero-copy program-framework, **onderhouden door Anza** (github.com/anza-xyz/
+pinocchio — de Solana/Agave-maintainer), v0.11.2 (2026-06), actief. Zero-copy
+instruction-decoding, geen anchor-boilerplate; claim (community/awesome-solana-
+ai): 88–95% CU-reductie op boilerplate-dominante programma's.
+
+**Voor OBP:**
+- obp-core (Anchor 1.1.2): 8 instructies, 4.4k–45k CU (matrix-CU-tabel), draait
+  groen op devnet 4.3.0-rc.0 (14/14 + 8/8) → anchor-overhead is een fractie;
+  de CU-druk zit in de ML-DSA-**algoritme**, niet in het framework.
+- Migratie-kosten: alle `#[account]`-constraints, PDA-logica, IDL, anchor-spl
+  → herschrijven + matrix-hervalidatie.
+- **Oordeel: géén fase-1-upgrade voor obp-core** (Anchor blijft hier het
+  juiste gereedschap; gemeten werkend op de nieuwe runtime). **Wél relevant
+  voor M4.2**: als er een **toegewijd, dun PQ-verificatieprogramma** komt
+  (Track 2, CU-kritiek, minimale overhead) is Pinocchio (of rauw
+  `solana-program`) de juiste keuze. "anchor-solana" (anchor-lang 1.1.2) +
+  agave 4.x = geen problemen gemeten.
+
+### 15.4 Over naar M4.2
+
+- Track 2: geoptimaliseerde ML-DSA-port (doel ≤1.2M CU) — evaluatie
+  SilenceLabs-core / eigen port; meetinfra staat al (track2-cu-benchmark.ts,
+  pq_benchmark-instructie).
+- SDK: `verifyCoinChain` PQ-bewust via `verifyCoinChainAsync` + `keyProvider`
+  (dit blok af; 24/24 tests). Overlegpunt (D6/Q6-Q7): CoinFile v2 = waar de
+  owner→pk-relatie in het bestand zelf komt (wallet-host).
+- Eventueel: `set_allowance` init_if_needed (M1-design, documentatie alleen).

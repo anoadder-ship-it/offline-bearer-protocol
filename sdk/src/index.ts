@@ -5,6 +5,7 @@ export * from './layout';
 export * from './coinfile';
 export * from './chain';
 export * from './coin';
+export * from './pq';
 export * from './wrapper';
 export * from './accounts';
 export * from './precompile';

@@ -37,3 +37,16 @@ export function appendLink(coin: CoinCore, currentOwnerSigner: Signer, newOwner:
 
 /** Huidige eigenaar = owner van de laatste state. */
 export const currentOwner = (coin: CoinCore): Buffer => currentOwnerOf(coin);
+
+/** M4.1 (PQ): async signer (mldsa-wasm is async; Ed25519-bovenliggende code
+ *  blijft sync via Signer). Een sync Signer is ook geldig (await op een
+ *  niet-Promise levert de waarde). */
+export interface AsyncSigner { sign(msg: Buffer): Promise<Buffer> | Buffer }
+
+/** Async variant van appendLink (PQ-chains; M4.1). */
+export async function appendLinkAsync(coin: CoinCore, currentOwnerSigner: AsyncSigner, newOwner: Buffer | Uint8Array): Promise<CoinCore> {
+  const last = coin.states[coin.states.length - 1];
+  const next = nextState(last, asBuf(newOwner));
+  const sig = await currentOwnerSigner.sign(stateHash(next));
+  return { ...coin, states: [...coin.states, next], sigs: [...coin.sigs, sig] };
+}

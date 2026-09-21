@@ -29,13 +29,18 @@ pub struct CloseInstance<'info> {
     )]
     pub config: Account<'info, Config>,
     pub mint_authority: Signer<'info>,
-    /// Marker PDA [b"vault"] — PDA-check in de handler; drain + assign system.
+    /// CHECK: Marker PDA [b"vault"] — PDA-seeds handmatig geverifieerd in de
+    /// handler via find_program_address; 8-byte marker zonder Anchor-struct.
+    /// Drain (lamports) + assign naar system-program in de handler.
     #[account(mut)]
     pub vault_pda: UncheckedAccount<'info>,
-    /// Marker PDA [b"fee"] — PDA-check in de handler; drain + assign system.
+    /// CHECK: Marker PDA [b"fee"] — PDA-seeds handmatig geverifieerd in de
+    /// handler; 8-byte marker zonder Anchor-struct. Idem vault_pda.
     #[account(mut)]
     pub fee_pda: UncheckedAccount<'info>,
-    /// Ontvanger van de gedraineerde lamports (rent van de 3 markers).
+    /// CHECK: Willekeurige wallet (geen PDA/owner-constraint nodig): de
+    /// ontvanger van de gedraineerde rent-lamports; autorisatie = mint-authority
+    /// (config-constraint hierboven).
     #[account(mut)]
     pub drain_to: UncheckedAccount<'info>,
     pub system_program: Program<'info, System>,

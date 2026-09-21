@@ -11,7 +11,7 @@ import { stateHash } from '../src/layout';
 import { SigScheme } from '../src/constants';
 import type { CoinCore } from '../src/coinfile';
 
-const SERIAL = sha256(Buffer.from('obp-pq-test-coin'));
+const SERIAL = Buffer.from(sha256(Buffer.from('obp-pq-test-coin')));
 const VALUE = 100n;
 const owner1 = Buffer.alloc(32, 0x11); // off-curve "addressen" (geen ed25519-requirement)
 const owner2 = Buffer.alloc(32, 0x22);

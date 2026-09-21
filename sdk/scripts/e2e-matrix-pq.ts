@@ -96,7 +96,7 @@ async function main() {
   // P1: PQ-coin bouwen (genesis → holder2 → holder3), ML-DSA-44 per link.
   console.log('\n== P1: PQ-coin (ML-DSA-44) ==');
   const RUN_ID = String(Date.now()).slice(-6);
-  const serial = sha256(Buffer.from('obp-m41-pq-acceptance-001-' + RUN_ID)); // vers per run (idempotente her-runs)
+  const serial = Buffer.from(sha256(Buffer.from('obp-m41-pq-acceptance-001-' + RUN_ID))); // vers per run (idempotente her-runs)
   let coin: CoinCore = { serial, value: VALUE, states: [genesisState(serial, VALUE, recipient.publicKey.toBytes())], sigs: [], sigScheme: 1 };
   // link 1: recipient (state_0) → holder2
   const st1 = nextState(coin.states[0], holder2.publicKey.toBytes());
@@ -165,7 +165,7 @@ async function main() {
     // On-chain commits = H(sig-field) — de program-eigen check (verify_sig_commit)
     // op beide links + offline-herberekening van de commitField-structuur.
     const okCommits = sub.sigCommits[1].equals(sha256(commitField(asBuf(coin.sigs[0])))) && sub.sigCommits[2].equals(sha256(commitField(asBuf(coin.sigs[1]))));
-    record('P3b on-chain sigCommits = H(commitField(sig))', okCommits, 'stored[1]=' + sub.sigCommits[1].toString('hex').slice(0,16) + '… expect=' + sha256(commitField(asBuf(coin.sigs[0]))).toString('hex').slice(0,16) + '…');
+    record('P3b on-chain sigCommits = H(commitField(sig))', okCommits, 'stored[1]=' + Buffer.from(sub.sigCommits[1]).toString('hex').slice(0,16) + '… expect=' + Buffer.from(sha256(commitField(asBuf(coin.sigs[0])))).toString('hex').slice(0,16) + '…');
     await client.send('finalize[pq]', finalizeIx(serial, 0, 1, recipient.publicKey, recipient.publicKey, holder3.publicKey, vaultMint, payer.publicKey), [], payer);
     const subP = (await fetchSubmission(conn, serial, 0))!;
     record('P3c finalize → PENDING (head)', subP.status === SubmissionStatus.PENDING, 'status=' + subP.status);

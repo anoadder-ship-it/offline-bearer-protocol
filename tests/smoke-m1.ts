@@ -17,7 +17,8 @@ import * as spl from '@solana/spl-token';
 import { ed25519 } from '@noble/curves/ed25519';
 import { sha256 } from '@noble/hashes/sha256';
 
-const PROGRAM_ID = new web3.PublicKey('5oUPUTuSdU3bWLtVTdcisu1BtgwNt29jH4fVTnfH2XiM');
+// Audit-fix (2026-09-21): programma-ID parameteriseerbaar; default = canoniek (SBPF v3, M4+PQ).
+const PROGRAM_ID = new web3.PublicKey(process.env.OBP_PROGRAM_ID || '8M5ruFEhFfenHSkjsUcf2FaZFKKKamJEHWRCSfttNHi6');
 const TOKEN_PROGRAM_ID = spl.TOKEN_PROGRAM_ID;
 const SYS = web3.SystemProgram.programId;
 const connection = new web3.Connection('https://api.devnet.solana.com', 'confirmed');
@@ -149,7 +150,7 @@ async function main() {
   }
   console.log('ATAs gecompleteerd (mintAuth, vault, feeSink, recipient, holder3, escrow)');
 
-  // --- E1: init
+  // --- E1: init (idempotent: config is singleton op devnet; sla over als al geinit)
   console.log('\n== E2: init ==');
   const initArgs = Buffer.concat([
     pk(mint),                  // vault_mint
@@ -158,14 +159,19 @@ async function main() {
     u16le(MAX_LINKS),          // max_links_per_tx (u16)
     u64le(DEFAULT_ALLOWANCE),  // default_allowance
   ]);
-  await send('init', new web3.TransactionInstruction({
-    programId: PROGRAM_ID,
-    keys: [
-      w(cfgPda, true), w(vaultPda, true), w(feePda, true),
-      s(mintAuthority.publicKey), s(payer.publicKey, true), w(SYS, false),
-    ],
-    data: ixData('init', initArgs),
-  }), [mintAuthority]);
+  const cfgBefore = await connection.getAccountInfo(cfgPda);
+  if (cfgBefore && cfgBefore.data.length > 0) {
+    console.log('  config bestaat al — init overgeslagen (idempotent)');
+  } else {
+    await send('init', new web3.TransactionInstruction({
+      programId: PROGRAM_ID,
+      keys: [
+        w(cfgPda, true), w(vaultPda, true), w(feePda, true),
+        s(mintAuthority.publicKey), s(payer.publicKey, true), w(SYS, false),
+      ],
+      data: ixData('init', initArgs),
+    }), [mintAuthority]);
+  }
   const cfg0 = await readAcc(cfgPda);
   console.log('  config: mint_authority=', new web3.PublicKey(cfg0!.subarray(8, 40)).toBase58().slice(0, 8),
     ' supply=', cfg0?.readBigUInt64LE(94), ' cap=', cfg0?.readBigUInt64LE(86));

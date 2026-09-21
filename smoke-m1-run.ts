@@ -1,5 +1,6 @@
 /**
  * OBP M1 smoke test — devnet, volledige protocol-lus (SPEC.md §5).
+ * LEGACY M1-artefact: voor de actuele E2E zie sdk/scripts/e2e-matrix.ts.
  *
  * Handmatige transacties (geen Anchor SDK): volledige controle over account
  * lists (exacte struct-volgorde), borsh-data en PDAs. Meet: balances na elke
@@ -17,7 +18,7 @@ import * as spl from '@solana/spl-token';
 import { ed25519 } from '@noble/curves/ed25519';
 import { sha256 } from '@noble/hashes/sha256';
 
-const PROGRAM_ID = new web3.PublicKey('9sbzeTmpkAjEHkN9j4PoKcoZrf6ALhzfip28sZPtfdbN');
+const PROGRAM_ID = new web3.PublicKey(process.env.OBP_PROGRAM_ID || '8M5ruFEhFfenHSkjsUcf2FaZFKKKamJEHWRCSfttNHi6');
 const TOKEN_PROGRAM_ID = spl.TOKEN_PROGRAM_ID;
 const SYS = web3.SystemProgram.programId;
 const connection = new web3.Connection('https://api.devnet.solana.com', 'confirmed');

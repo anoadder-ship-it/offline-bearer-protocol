@@ -20,15 +20,15 @@ export function createProgramOwnedAccountIx(
 }
 
 /** PDA-derivatie (mirror van het programma: seeds + bump via find_program_address). */
-export function pda(prefix: string, ...extra: Buffer[]): [PublicKey, number] {
+export function pda(prefix: string, ...extra: (Buffer | Uint8Array)[]): [PublicKey, number] {
   return PublicKey.findProgramAddressSync([Buffer.from(prefix, 'utf8'), ...extra], PROGRAM_ID);
 }
 export const configPda = (): [PublicKey, number] => pda('config');
 export const vaultPda = (): [PublicKey, number] => pda('vault');
 export const feePda = (): [PublicKey, number] => pda('fee');
-export const registryPda = (serial: Buffer): [PublicKey, number] => pda('mint', serial);
-export const headPda = (serial: Buffer): [PublicKey, number] => pda('head', serial);
-export const submissionPda = (serial: Buffer, attempt: number): [PublicKey, number] =>
+export const registryPda = (serial: Buffer | Uint8Array): [PublicKey, number] => pda('mint', serial);
+export const headPda = (serial: Buffer | Uint8Array): [PublicKey, number] => pda('head', serial);
+export const submissionPda = (serial: Buffer | Uint8Array, attempt: number): [PublicKey, number] =>
   pda('submission', serial, Buffer.from([attempt]));
 export const allowancePda = (recipient: PublicKey): [PublicKey, number] =>
   pda('allowance', Buffer.from(recipient.toBytes()));

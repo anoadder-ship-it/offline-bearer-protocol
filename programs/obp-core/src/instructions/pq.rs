@@ -49,7 +49,8 @@ pub fn slhdsa128f_verify(pk: &[u8], msg: &[u8], sig: &[u8]) -> bool {
 /// `scheme`: 1 = ML-DSA-44, 2 = SLH-DSA-128f. Geeft BadSignature als verificatie faalt.
 #[derive(Accounts)]
 pub struct PqBenchmark<'info> {
-    /// Data-account: pk_len(4) ‖ pk ‖ msg_len(4) ‖ msg ‖ sig (geen owner-check; benchmark).
+    /// CHECK: Data-account (walleteigenaar): pk_len(4) ‖ pk ‖ msg_len(4) ‖ msg ‖ sig.
+    /// Geen owner/mint-constraint: benchmark-instructie — read-only, geen waarde-uitwisseling.
     pub data: UncheckedAccount<'info>,
 }
 
@@ -81,6 +82,8 @@ pub fn pq_benchmark(ctx: Context<PqBenchmark>, scheme: u8) -> Result<()> {
 /// chunks over meerdere tx's (setup, niet gemeten).
 #[derive(Accounts)]
 pub struct PqWriteData<'info> {
+    /// CHECK: Data-account (walleteigenaar); chunk-write op offset. Geen owner-constraint:
+    /// benchmark-setup, geen waarde-uitwisseling (geen mint/ATA betrokken).
     #[account(mut)]
     pub data: UncheckedAccount<'info>,
 }

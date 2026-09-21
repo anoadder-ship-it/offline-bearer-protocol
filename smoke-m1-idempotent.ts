@@ -1,12 +1,13 @@
 // OBP M1 idempotente smoke test — controleert state per stap, sluit alleen
 // over wat nog ontbreekt. Werkt door na een crash of rate-limit break.
+// LEGACY M1-artefact: voor de actuele E2E zie sdk/scripts/e2e-matrix.ts.
 import * as fs from 'fs';
 import * as web3 from '@solana/web3.js';
 import * as spl from '@solana/spl-token';
 import { ed25519 } from '@noble/curves/ed25519';
 import { sha256 } from '@noble/hashes/sha256';
 
-const PROGRAM_ID = new web3.PublicKey('9D2fU2g13Y55uvk6kLiHRknxd6rzu84nsHy6gnjTLqzt');
+const PROGRAM_ID = new web3.PublicKey(process.env.OBP_PROGRAM_ID || '8M5ruFEhFfenHSkjsUcf2FaZFKKKamJEHWRCSfttNHi6');
 const connection = new web3.Connection('https://api.devnet.solana.com', 'confirmed');
 const SYS = web3.SystemProgram.programId;
 const TOKEN_PROGRAM_ID = spl.TOKEN_PROGRAM_ID;

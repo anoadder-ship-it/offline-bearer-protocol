@@ -12,36 +12,36 @@ export interface CoinState {
 
 /** Normaliseer Buffer|Uint8Array naar Buffer (noble-hash's leveren Uint8Array). */
 export function asBuf(x: Buffer | Uint8Array | ArrayLike<number>): Buffer {
-  return Buffer.isBuffer(x) ? x : Buffer.from(x as Uint8Array);
+  return x instanceof Buffer ? x : Buffer.from(x as Uint8Array);
 }
 
 export function stateHash(state: Buffer | Uint8Array): Buffer {
-  state = asBuf(state);
-  if (state.length !== STATE_SIZE) throw new Error('state moet ' + STATE_SIZE + ' bytes zijn');
-  return Buffer.from(sha256(state));
+  const st: Buffer = asBuf(state);
+  if (st.length !== STATE_SIZE) throw new Error('state moet ' + STATE_SIZE + ' bytes zijn');
+  return Buffer.from(sha256(st));
 }
 
 export function encodeState(serial: Buffer | Uint8Array, value: bigint, owner: Buffer | Uint8Array, prevHash: Buffer | Uint8Array): Buffer {
-  serial = asBuf(serial); owner = asBuf(owner); prevHash = asBuf(prevHash);
-  if (serial.length !== SERIAL_SIZE) throw new Error('serial moet 32 bytes zijn');
-  if (owner.length !== 32) throw new Error('owner moet 32 bytes zijn');
-  if (prevHash.length !== 32) throw new Error('prevHash moet 32 bytes zijn');
+  const ser: Buffer = asBuf(serial); const own: Buffer = asBuf(owner); const ph: Buffer = asBuf(prevHash);
+  if (ser.length !== SERIAL_SIZE) throw new Error('serial moet 32 bytes zijn');
+  if (own.length !== 32) throw new Error('owner moet 32 bytes zijn');
+  if (ph.length !== 32) throw new Error('prevHash moet 32 bytes zijn');
   const s = Buffer.alloc(STATE_SIZE);
-  serial.copy(s, 0);
+  ser.copy(s, 0);
   s.writeBigUInt64LE(value, 32);
-  owner.copy(s, 40);
-  prevHash.copy(s, 72);
+  own.copy(s, 40);
+  ph.copy(s, 72);
   return s;
 }
 
 export function decodeState(s: Buffer | Uint8Array): CoinState {
-  s = asBuf(s);
-  if (s.length !== STATE_SIZE) throw new Error('state moet ' + STATE_SIZE + ' bytes zijn');
+  const st: Buffer = asBuf(s);
+  if (st.length !== STATE_SIZE) throw new Error('state moet ' + STATE_SIZE + ' bytes zijn');
   return {
-    serial: s.subarray(0, 32),
-    value: s.readBigUInt64LE(32),
-    owner: s.subarray(40, 72),
-    prevHash: s.subarray(72, 104),
+    serial: Buffer.from(st.subarray(0, 32)),
+    value: st.readBigUInt64LE(32),
+    owner: Buffer.from(st.subarray(40, 72)),
+    prevHash: Buffer.from(st.subarray(72, 104)),
   };
 }
 

@@ -7,7 +7,7 @@ import { sha256 } from '@noble/hashes/sha256';
 import { DEVNET_URL } from '../src/constants';
 import { registryPda, submissionPda } from '../src/accounts';
 
-const M1_SERIAL = sha256(Buffer.from('obp-m1-smoke-coin-001'));
+const M1_SERIAL = Buffer.from(sha256(Buffer.from('obp-m1-smoke-coin-001')));
 
 async function main() {
   const conn = new Connection(DEVNET_URL, 'confirmed');

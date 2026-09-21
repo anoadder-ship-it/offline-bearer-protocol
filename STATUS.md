@@ -901,3 +901,56 @@ ai): 88–95% CU-reductie op boilerplate-dominante programma's.
   (dit blok af; 24/24 tests). Overlegpunt (D6/Q6-Q7): CoinFile v2 = waar de
   owner→pk-relatie in het bestand zelf komt (wallet-host).
 - Eventueel: `set_allowance` init_if_needed (M1-design, documentatie alleen).
+
+
+## 16. GitHub-audit (keys, data, andere fouten) + tooling-provenance (2026-09-21)
+
+Vóór M4.2 volledige audit van alles wat op GitHub staat (alle 66 blobs in de
+hele geschiedenis, 65 bestanden). Repo is **private** (ongeauthenticeerde
+API = 404).
+
+### 16.1 Keys/secrets — bevinding
+
+- **Geen private keys in de repo of geschiedenis**: 0 hits voor 128-hex
+  (64-byte) strings en 0 hits voor 64-elemente JSON-keypair-arrays.
+- `.gitignore` dekt `*-keypair*.json`, `id.json`, `target/`, `node_modules/`
+  — upgrade/mint authority leven lokaal onder
+  `~/.config/offline-bearer-protocol/` (§4), niet in git.
+- Alle base58-hits = programma-IDs, SHA256-integrity-hashes (Cargo/
+  package-lock) of devnet-transactiesignaturen (evidence/fixtures) — geen
+  secrets.
+- `SEED`-constanten in scripts/tests = **deterministische devnet-test-
+  identiteiten** (bewust reproducible; M1_SEED-patroon, gedocumenteerd in
+  de script-headers) — geen productie-keys.
+- `sdk/fixtures/pq/vectors.txt`: MASTER_SEED + PK/SIG-paren = **fixture-
+  keys** (deterministisch gegenereerd door `gen-pq-vectors.rs`, geen
+  secret-key opgenomen; voor cross-verify RustCrypto↔mldsa-wasm).
+
+**Conclusie: geen key-lek. Conventie blijft gelden (repo kan public worden).**
+
+### 16.2 Gevonden fouten + fixes (alle gecommit)
+
+| # | Fout | Fix |
+|---|---|---|
+| 1 | `SPEC.md` §4 wees naar **v1**-programma `5oUPUTu…` (vervangen) | canoniek `8M5ruFEh…` + verwijzing naar §4/9/14 voor de build-geschiedenis |
+| 2 | `README.md` vastgelopen op **M0** (structuren `client/`, `tests/` ≠ werkelijkheid) | herschreven: M4.1.1-status, werkelijke structuur (sdk/, scripts, evidence), programma-ID + key-beheer, A4 (PQ) in trust-basis |
+| 3 | Drie M1-smoke-scripts met **drie verschillende** hardcoded IDs (`5oUPUTu`, `9sbze…`, `9D2fU2g`) + hardcoded `~/…`-paden | `OBP_PROGRAM_ID` env (default = canoniek) + `$HOME`; `tests/smoke-m1.ts` init-idempotent (config-singleton); legacy-scripts gelabeld |
+| 4 | Root `package.json`: `@coral-xyz/anchor 0.31.1` vs CLI/Anchor.toml 1.1.2 | `^0.32.1` (nieuwste stable JS-lijn; de anchor-1.x versienummers lopen **gescheiden** Rust/CLI vs JS — documentatiefeit, geen bug) |
+| 5 | `sdk/package-lock.json` naast `bun.lock` (dubbele lockfile) | verwijderd (bun = SDK-runtime, bun.lock is canoniek) |
+| 6 | Cyrillische typo in `sdk/src/constants.ts` ("v2-proграмма") | "v2-programma" |
+| 7 | **SDK-typesysteem**: ~40 tsc-fouten (TS 5.9 + @types/node 26: generische `Buffer<ArrayBufferLike>`/`Uint8Array`-frictie; nooit als gate gedraaid omdat bun niet typecheckt) | SDK gepind op TS ~5.6.3 + @types/node ^22 (pre-generic wereld); `asBuf` robuust (`instanceof`); **nieuwe constant met expliciete type** i.p.v. herassignment (narrowing faalt bij dubbele Buffer-declaratie bun-types/@types/node); `pda()`/`fetch*`/`ed25519Signer` verbreed naar `Buffer \| Uint8Array`; `Buffer.from` op gegenereerde serials; fail-closed null-guards (`cfg`/`cfg2`) → **`tsc --noEmit` (strict) = 0 fouten** |
+| 8 | `track2-cu-benchmark.ts`: `unitsConsumed` op `ConfirmedTransactionMeta` (type-mismatch, web3.js 1.99) | expliciete cast op het optionele veld |
+| 9 | `anchor test` (CLI 1.1.2): IDL-build safety-lint — `vault_pda` (e.d.) Unsafe-account zonder `/// CHECK:`-doc | `/// CHECK:`-documentatie op de drie unchecked accounts in `close_instance` (admin.rs); SBF-build + IDL-build groen |
+
+Resultaat: `tsc --noEmit` 0 fouten, `bun test` 24/24, `anchor test` (M1-full-
+lus op devnet, idempotent) her-gevalideerd na de anchor-0.32.1-bump.
+
+### 16.3 Tooling-provenance (wie/wat doet het werk)
+
+Sinds de M4.1.1-sessie (2026-09-20) tot deze audit (2026-09-21) loopt het
+ontwikkelwerk via **Qwen 3.8 27B (uncensored)** via **orcarouter**, met MCP-
+tools: `solana-mcp` (RPC: balances, transacties, Jupiter-quotes, stake,
+validators), `github-mcp` (repo/commits/PRs), `cardano-mcp`, `file-system-mcp`,
+`shell-mcp`, `google-mcp` (SerpApi), `js-code-sandbox` (deno), `rag-v1`.
+Alle bewijs in deze STATUS staat reproduceerbaar via de scripts in de repo
+(bun/bunx/cargo/anchor), onafhankelijk van de AI-sessie.

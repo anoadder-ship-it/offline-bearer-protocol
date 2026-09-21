@@ -50,24 +50,24 @@ export function encodeCoinCore(c: CoinCore): Buffer {
   return buf;
 }
 
-export function decodeCoinCore(buf: Buffer | Uint8Array): CoinCore {
-  buf = asBuf(buf);
-  if (buf.length < HDR) throw new Error('buffer te klein');
-  if (!COIN_MAGIC.equals(buf.subarray(0, 4))) throw new Error('magic mismatch (geen CoinCore)');
-  const version = buf.readUInt16LE(4);
+export function decodeCoinCore(input: Buffer | Uint8Array): CoinCore {
+  const b: Buffer = asBuf(input);
+  if (b.length < HDR) throw new Error('buffer te klein');
+  if (!COIN_MAGIC.equals(b.subarray(0, 4))) throw new Error('magic mismatch (geen CoinCore)');
+  const version = b.readUInt16LE(4);
   if (version !== COINFILE_VERSION) throw new Error('onbekende versie ' + version);
-  const n = buf.readUInt16LE(7);
+  const n = b.readUInt16LE(7);
   const expected = coinCoreSize(n);
-  if (buf.length !== expected) throw new Error('grootte ' + buf.length + ' != verwacht ' + expected);
-  const sigScheme = buf.readUInt8(6);
-  const serial = Buffer.from(buf.subarray(9, 41));
-  const value = buf.readBigUInt64LE(41);
+  if (b.length !== expected) throw new Error('grootte ' + b.length + ' != verwacht ' + expected);
+  const sigScheme = b.readUInt8(6);
+  const serial = Buffer.from(b.subarray(9, 41));
+  const value = b.readBigUInt64LE(41);
   const states: Buffer[] = [];
   let o = HDR;
-  for (let i = 0; i < n; i++) { states.push(Buffer.from(buf.subarray(o, o + STATE_SIZE))); o += STATE_SIZE; }
+  for (let i = 0; i < n; i++) { states.push(Buffer.from(b.subarray(o, o + STATE_SIZE))); o += STATE_SIZE; }
   const sigs: Buffer[] = [];
-  for (let i = 0; i < n - 1; i++) { sigs.push(Buffer.from(buf.subarray(o, o + SIG_SIZE))); o += SIG_SIZE; }
-  const checksum = Buffer.from(sha256(buf.subarray(0, o)));
-  if (!checksum.equals(buf.subarray(o, o + 32))) throw new Error('checksum mismatch (beschadigd bestand)');
+  for (let i = 0; i < n - 1; i++) { sigs.push(Buffer.from(b.subarray(o, o + SIG_SIZE))); o += SIG_SIZE; }
+  const checksum = Buffer.from(sha256(b.subarray(0, o)));
+  if (!checksum.equals(b.subarray(o, o + 32))) throw new Error('checksum mismatch (beschadigd bestand)');
   return { serial, value, states, sigs, sigScheme };
 }

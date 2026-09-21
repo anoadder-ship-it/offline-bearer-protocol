@@ -7,7 +7,7 @@ import { asBuf, genesisState, nextState, ownerOf, stateHash } from './layout';
 export interface Signer { sign(msg: Buffer): Buffer }
 
 /** Ed25519-signer over een 32-byte seed (of 64-byte keypair-array seed|pub). */
-export function ed25519Signer(seed: Buffer): Signer {
+export function ed25519Signer(seed: Uint8Array): Signer {
   const priv = seed.length === 64 ? seed.subarray(0, 32) : seed;
   if (priv.length !== 32) throw new Error('seed moet 32 (of 64) bytes zijn');
   return { sign: (msg: Buffer) => Buffer.from(ed25519.sign(msg, priv)) };

@@ -514,20 +514,25 @@ pub struct FinalizeCheckIn<'info> {
             @ ObpError::StatusInvalid
     )]
     pub submission: Account<'info, Submission>,
-    /// Checks in handler: owner == submission-PDA.
+    /// CHECK: Token-account (token-program eigenaar); ownership (owner == submission-PDA)
+    /// en mint-check in de handler.
     #[account(mut)]
     pub escrow: UncheckedAccount<'info>,
-    /// Checks in handler: owner == submission.checker.
+    /// CHECK: Token-account (token-program eigenaar); ownership (owner == submission.checker)
+    /// en mint-check in de handler.
     #[account(mut)]
     pub checker_token: UncheckedAccount<'info>,
-    /// Checks in handler (win-tak): owner == submission.final_owner.
+    /// CHECK: Token-account (token-program eigenaar); ownership (owner == submission.final_owner,
+    /// win-tak) en mint-check in de handler.
     #[account(mut)]
     pub winner_token: UncheckedAccount<'info>,
-    /// Checks in handler: owner == vault_pda.
+    /// CHECK: Token-account (token-program eigenaar); ownership (owner == vault_pda)
+    /// en mint-check in de handler.
     #[account(mut)]
     pub coin_vault: UncheckedAccount<'info>,
     pub vault_pda: Account<'info, VaultPda>,
-    /// Checks in handler: owner == fee_pda.
+    /// CHECK: Token-account (token-program eigenaar); ownership (owner == fee_pda)
+    /// en mint-check in de handler.
     #[account(mut)]
     pub fee_sink: UncheckedAccount<'info>,
     pub fee_pda: Account<'info, FeePda>,
@@ -977,20 +982,25 @@ pub struct Settle<'info> {
             @ ObpError::StatusInvalid
     )]
     pub submission: Account<'info, Submission>,
-    /// Checks in handler: owner == submission-PDA.
+    /// CHECK: Token-account (token-program eigenaar); ownership (owner == submission-PDA)
+    /// en mint-check in de handler.
     #[account(mut)]
     pub escrow: UncheckedAccount<'info>,
-    /// Checks in handler: owner == submission.checker.
+    /// CHECK: Token-account (token-program eigenaar); ownership (owner == submission.checker)
+    /// en mint-check in de handler.
     #[account(mut)]
     pub checker_token: UncheckedAccount<'info>,
-    /// Checks in handler: owner == submission.final_owner.
+    /// CHECK: Token-account (token-program eigenaar); ownership (owner == submission.final_owner)
+    /// en mint-check in de handler.
     #[account(mut)]
     pub winner_token: UncheckedAccount<'info>,
-    /// Checks in handler: owner == vault_pda.
+    /// CHECK: Token-account (token-program eigenaar); ownership (owner == vault_pda)
+    /// en mint-check in de handler.
     #[account(mut)]
     pub coin_vault: UncheckedAccount<'info>,
     pub vault_pda: Account<'info, VaultPda>,
-    /// Checks in handler: owner == fee_pda.
+    /// CHECK: Token-account (token-program eigenaar); ownership (owner == fee_pda)
+    /// en mint-check in de handler.
     #[account(mut)]
     pub fee_sink: UncheckedAccount<'info>,
     pub fee_pda: Account<'info, FeePda>,

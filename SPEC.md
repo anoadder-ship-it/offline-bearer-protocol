@@ -144,8 +144,9 @@ Eigenschappen:
 
 ## 4. Rollen en on-chain accounts (Solana/Anchor)
 
-Programma-ID (fase 1, devnet): `5oUPUTuSdU3bWLtVTdcisu1BtgwNt29jH4fVTnfH2XiM`
-(zie STATUS.md sectie 4).
+Programma-ID (fase 1, devnet, canoniek): `8M5ruFEhFfenHSkjsUcf2FaZFKKKamJEHWRCSfttNHi6`
+(SBPF v3-build met PQ-instructies; vorige builds `5oUPUTu…` (v1, vervangen) en
+`9D2fU2g…` (v2 zonder PQ) zie STATUS.md secties 4, 9 en 14).
 
 | Account | Seeds | Eigenaar | Inhoud | LEN |
 |---|---|---|---|---|

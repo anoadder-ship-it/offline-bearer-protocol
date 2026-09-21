@@ -162,7 +162,7 @@ export const fetchConfig = async (conn: Connection) => (async () => {
   const d = await fetchData(conn, configPda()[0]);
   return d ? parseConfig(d) : null;
 })();
-export const fetchRegistry = async (conn: Connection, serial: Buffer) => (async () => {
+export const fetchRegistry = async (conn: Connection, serial: Buffer | Uint8Array) => (async () => {
   const d = await fetchData(conn, registryPda(serial)[0]);
   return d ? parseRegistry(d) : null;
 })();
@@ -170,7 +170,7 @@ export const fetchHead = async (conn: Connection, serial: Buffer) => (async () =
   const d = await fetchData(conn, headPda(serial)[0]);
   return d ? parseHead(d) : null;
 })();
-export const fetchSubmission = async (conn: Connection, serial: Buffer, attempt: number) => (async () => {
+export const fetchSubmission = async (conn: Connection, serial: Buffer | Uint8Array, attempt: number) => (async () => {
   const d = await fetchData(conn, submissionPda(serial, attempt)[0]);
   return d ? parseSubmission(d) : null;
 })();

@@ -54,16 +54,16 @@ export function serializeEncrypted(e: EncryptedCoinFile): Buffer {
   return out;
 }
 
-export function parseEncrypted(buf: Buffer | Uint8Array): EncryptedCoinFile {
-  buf = asBuf(buf);
-  if (!COIN_ENCRYPTED_MAGIC.equals(buf.subarray(0, 4))) throw new Error('encrypted magic mismatch');
-  if (buf.readUInt16LE(4) !== COINFILE_VERSION) throw new Error('encrypted versie onbekend');
-  const keyHint = buf.readUInt8(6);
-  const nonce = Buffer.from(buf.subarray(7, 19));
-  const ctLen = buf.readUInt32LE(19);
-  const ciphertext = Buffer.from(buf.subarray(23, 23 + ctLen));
-  const tag = Buffer.from(buf.subarray(23 + ctLen, 23 + ctLen + 16));
-  if (buf.length !== 23 + ctLen + 16) throw new Error('encrypted grootte inconsistent');
+export function parseEncrypted(input: Buffer | Uint8Array): EncryptedCoinFile {
+  const b: Buffer = asBuf(input);
+  if (!COIN_ENCRYPTED_MAGIC.equals(b.subarray(0, 4))) throw new Error('encrypted magic mismatch');
+  if (b.readUInt16LE(4) !== COINFILE_VERSION) throw new Error('encrypted versie onbekend');
+  const keyHint = b.readUInt8(6);
+  const nonce = Buffer.from(b.subarray(7, 19));
+  const ctLen = b.readUInt32LE(19);
+  const ciphertext = Buffer.from(b.subarray(23, 23 + ctLen));
+  const tag = Buffer.from(b.subarray(23 + ctLen, 23 + ctLen + 16));
+  if (b.length !== 23 + ctLen + 16) throw new Error('encrypted grootte inconsistent');
   return { keyHint, nonce, ciphertext, tag };
 }
 

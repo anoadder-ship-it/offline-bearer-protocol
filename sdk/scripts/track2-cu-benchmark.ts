@@ -36,7 +36,7 @@ const send = async (label: string, build: (tx: web3.Transaction) => void): Promi
   const r = await conn.sendRawTransaction(await tx.serialize());
   await conn.confirmTransaction(r, 'confirmed');
   const c = await conn.getTransaction(r, { maxSupportedTransactionVersion: 0 });
-  return { sig: r, cu: c?.meta?.preBalances ? (c.meta!.unitsConsumed ?? 0) : 0, err: c?.meta?.err ?? null };
+  return { sig: r, cu: c?.meta?.preBalances ? ((c.meta as { unitsConsumed?: number }).unitsConsumed ?? 0) : 0, err: c?.meta?.err ?? null };
 };
 
 async function main() {

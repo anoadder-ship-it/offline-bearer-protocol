@@ -111,7 +111,7 @@ function buildChain(serial: Buffer, owners: Keypair[]): CoinCore {
 }
 
 async function mintNew(label: string): Promise<Buffer> {
-  const serial = sha256(Buffer.from('obp-m3-' + label));
+  const serial = Buffer.from(sha256(Buffer.from('obp-m3-' + label)));
   if (!(await fetchRegistry(conn, serial))) {
     const state0 = newCoin(serial, VALUE, recipient.publicKey.toBytes()).states[0];
     const gh = stateHash(state0);
@@ -196,6 +196,7 @@ async function settle(serial: Buffer, attempt: number, label: string) {
 
 async function waitWindow(serial: Buffer) {
   const cfg = await fetchConfig(conn);
+  if (!cfg) throw new Error('config ontbreekt op devnet (reset?)');
   const head = (await fetchHead(conn, serial))!;
   const deadline = head.pendingSinceSlot + cfg.challengeWindowSlots;
   for (;;) {
@@ -423,6 +424,7 @@ async function main() {
   console.log('\nCU-tabel (unitsConsumed):');
   for (const [k, v] of Object.entries(cu)) console.log('  ' + k + ': ' + v);
   const cfg2 = await fetchConfig(conn);
+  if (!cfg2) throw new Error('config ontbreekt op devnet (reset?)');
   const alF = (await fetchAllowance(conn, recipient.publicKey))!;
   console.log('\neindbalansen: vault=' + (await vaultBal()) + ' recipient=' + (await bal(recipient.publicKey))
     + ' holder2=' + (await bal(holder2.publicKey)) + ' holder3=' + (await bal(holder3.publicKey)));

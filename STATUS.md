@@ -1041,3 +1041,42 @@ Geen patch beschikbaar upstream (`first_patched: null`, laatste release
 Alle 4 gedismissed via de Dependabot-API (`dismissed_reason` +
 `dismissed_comment` per alert, bovenstaande onderbouwing samengevat).
 Bevestigd ná de PATCH-aanroepen: **0 open Dependabot-alerts.**
+
+### 17.5 Permanente CI-bewaking van de 17.3-aanname (2026-09-21)
+
+De `tolerable_risk`-dispositie voor `bigint-buffer` (§17.3) steunt op één
+concrete, verifieerbare aanname: het CoinFile-decodeerpad
+(`decodeCoinCore` in `sdk/src/coinfile.ts`; `decodeState`/`encodeState`/
+`stateHash` in `sdk/src/layout.ts`; `parseEncrypted` in
+`sdk/src/wrapper.ts`) raakt `bigint-buffer`/`@solana/buffer-layout-utils`
+nooit, direct of transitief. Die aanname was tot nu toe een momentopname
+(handmatig nagegrept); `sdk/test/coinfile-dependency-isolation.test.ts`
+maakt hem permanent en draait standaard mee in `bun test`.
+
+**Introspectiemethode, en waarom niet `require.cache`:** eerst geprobeerd
+zoals gevraagd (module-registratie inspecteren ná uitvoering), maar
+empirisch getest en verworpen: `require.cache` blijft in Bun leeg voor
+modules die via top-level `import` binnenkomen (`@solana/spl-token`
+importeren en aanroepen, dan `Object.keys(require.cache).length` loggen →
+`0`, geen Bun-eigenaardigheid van dit project maar van Bun's ESM-loader
+zelf, die niet via de CJS-registratie loopt). In plaats daarvan gebruikt
+de test `Bun.build()` om de daadwerkelijke, volledige (transitieve)
+import-graaf van elk bestand statisch op te lossen, en doorzoekt de
+gebundelde output op de `node_modules/<pakket>/`-padcommentaren die Bun
+per geïncludeerde module achterlaat. Sterker dan een runtime-registratie
+zou zijn geweest: vangt élk mogelijk pad door de code, niet alleen wat één
+testrun toevallig raakt. Negatief gecontroleerd: dezelfde methode op
+`sdk/src/accounts.ts` (dat wél `@solana/spl-token` gebruikt) toont beide
+markers wél — de check onderscheidt dus aantoonbaar aanwezig van
+afwezig, geen tautologie.
+
+**Rood-vóór-groen, zoals gebruikelijk in dit project:** tijdelijk een
+nep-import `import { toBigIntLE } from 'bigint-buffer'` toegevoegd aan
+`layout.ts` → alle drie de graaf-checks (coinfile/layout/wrapper — de
+eerste twee via hun eigen import van `layout.ts`) faalden meteen, met een
+foutmelding die letterlijk naar deze STATUS-sectie verwijst; de vierde
+test (de functionele round-trip, die niet bundelt) bleef groen. Import
+weer verwijderd, `git diff` bevestigde byte-identiek aan de committed
+versie, en `bun test` weer volledig groen (4/4 nieuw, 28/28 totaal in de
+suite). De test controleert dus aantoonbaar iets, niet enkel decoratief
+aanwezig.

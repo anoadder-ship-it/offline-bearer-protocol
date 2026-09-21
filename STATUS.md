@@ -954,3 +954,90 @@ validators), `github-mcp` (repo/commits/PRs), `cardano-mcp`, `file-system-mcp`,
 `shell-mcp`, `google-mcp` (SerpApi), `js-code-sandbox` (deno), `rag-v1`.
 Alle bewijs in deze STATUS staat reproduceerbaar via de scripts in de repo
 (bun/bunx/cargo/anchor), onafhankelijk van de AI-sessie.
+
+## 17. Dependabot-alerts: 4 open, alle afgewezen na bereikbaarheidsanalyse (2026-09-21)
+
+Push na §16 triggerde GitHub's Dependabot-scan: 4 open alerts (3 high, 1
+medium). Zelfde discipline als spankwallet STATUS.md sectie 138: per alert
+niet alleen de severity aflezen, maar de daadwerkelijke require-/aanroeppad
+uitputtend nagrepen in `node_modules`, met een expliciete classificatie
+(`not_used` = de kwetsbare functie wordt in ons daadwerkelijke pad nooit
+aangeroepen; `tolerable_risk` = de functie draait wel, maar de
+trigger-voorwaarde is aantoonbaar afwezig).
+
+### 17.1 `toml` (#3 CVE-2026-63376, #4 CVE-2026-77465) — not_used
+
+Keten: `@coral-xyz/anchor` → `dist/{cjs,esm}/workspace.js` → `toml.parse()`.
+Die aanroep zit achter een `Proxy`'s `get`-trap op het `workspace`-object
+(regel 56: `toml.parse(fs.readFileSync("Anchor.toml"))`) — vuurt uitsluitend
+bij toegang tot `anchor.workspace.<naam>`. Uitputtend gegrept over alle eigen
+`.ts`-bestanden (root, `sdk/`, `tests/`): **nul treffers** voor zowel
+`anchor.workspace` als een import van `@coral-xyz/anchor` zelf. Het pakket
+staat in `package.json` uitsluitend t.b.v. de Rust/Anchor-CLI (een los
+binair programma dat `Anchor.toml` met zijn eigen Rust-TOML-parser leest,
+niets met dit npm-pakket te maken) — de SDK bouwt instructies met de hand
+(`sdk/src/*.ts`), gebruikt Anchor's TS-client-wrapper nergens. Sterker dan
+het spankwallet-precedent (daar was dit `tolerable_risk`, want spankwallet's
+eigen tests roepen `anchor.workspace.*` wél aan): hier wordt de aanroep zelf
+nooit bereikt, ongeacht input.
+
+### 17.2 `stream-json` (#2 CVE-2026-71429, medium) — not_used
+
+Keten: `@solana/web3.js` → `jayson` → `Utils.parseStream` (`lib/utils.js:73`,
+enige stream-json-consument in jayson). `@solana/web3.js` require't
+uitsluitend `jayson/lib/client/browser` (`index.cjs.js:15`) — dat bestand
+importeert alleen `uuid` + `generateRequest`, nooit `utils.js`.
+`Utils.parseStream` wordt alleen aangeroepen door jayson's tcp/tls-client-
+en -servervarianten (`lib/client/tcp.js`, `lib/client/tls.js`,
+`lib/server/tcp.js`, `lib/server/tls.js`) — geen daarvan zit in het
+daadwerkelijk gebruikte require-pad. Extra bevestigd: elke `new Connection`
+in deze repo (`sdk/`, `tests/`, root-scripts) gebruikt een `https://`-string
+(devnet of lokale validator), nooit een custom tcp/tls-transport.
+
+### 17.3 `bigint-buffer` (#1 CVE-2025-3194, high) — tolerable_risk
+
+Keten: `@solana/spl-token` → `@solana/buffer-layout-utils` →
+`bigint.js` → `toBigIntLE()`/`toBigIntBE()`. **Wél bereikbaar**:
+`spl.getAccount()` wordt aangeroepen in alle e2e/smoke-scripts en decodeert
+daadwerkelijk via deze functie. Twee onafhankelijke redenen waarom de
+trigger-voorwaarde toch afwezig is:
+
+1. De buffer-lengte naar `toBigIntLE`/`toBigIntBE` is altijd een vaste,
+   in `bigint.js` code-gedefinieerde lengte (`u64`=8, `u128`=16, `u192`=24,
+   `u256`=32 bytes — `exports.u64 = bigInt_IMPL(true, 8)` etc.), nooit een
+   lengte die uit de data zelf wordt afgeleid.
+2. De bytes zelf komen altijd van een live `connection.getAccountInfo()`
+   -fetch van een account waarvan de layout wordt afgedwongen door het
+   SPL-Token(-2022)-programma zelf (vaste struct-offsets, ook met
+   extensions — de TLV-extensielaag zit ná de basisstruct, raakt de
+   `u64`-velden niet).
+
+**De belangrijkste check, specifiek voor dit project — voor een toekomstige
+lezer die dit pad ooit uitbreidt:** OBP heeft, anders dan een gewone
+Solana-devtool, een pad waar écht vijandige bytes binnenkomen: een
+`CoinFile` die van een andere (potentieel kwaadwillende) houder ontvangen
+wordt. Dat is precies het scenario waarin een classificatie als hierboven
+NIET zou mogen gelden als het CoinFile-pad ook maar ergens `bigint-buffer`
+raakt. Expliciet nagegaan (niet aangenomen): `decodeCoinCore`
+(`sdk/src/coinfile.ts`), `decodeState`/`encodeState`/`stateHash`
+(`sdk/src/layout.ts`) en `parseEncrypted` (`sdk/src/wrapper.ts`) — de
+bestanden die bearer-aangeleverde bytes daadwerkelijk parsen — gebruiken
+uitsluitend Node/Bun's **eigen** `Buffer.readBigUInt64LE()`/
+`readUInt16LE()`/`readUInt32LE()` (ingebouwde, native V8/Bun-implementatie,
+niet het `bigint-buffer`-npm-pakket). Geen enkele van deze functies
+importeert `bigint-buffer`, direct of transitief. **Het enige plek waar het
+CoinFile-pad een `u64`-achtige waarde decodeert, gebeurt dus met een andere,
+niet-kwetsbare implementatie dan waar deze CVE over gaat.** Mocht een latere
+uitbreiding van het CoinFile-formaat ooit `@solana/buffer-layout-utils` (of
+iets dat er transitief op leunt) gebruiken om bearer-aangeleverde bytes te
+decoderen, dan vervalt deze classificatie en moet `bigint-buffer` opnieuw
+beoordeeld worden — vandaar dat dit expliciet zo wordt vastgelegd.
+
+Geen patch beschikbaar upstream (`first_patched: null`, laatste release
+1.1.5 zit al in de vulnerable range).
+
+### 17.4 Uitgevoerd
+
+Alle 4 gedismissed via de Dependabot-API (`dismissed_reason` +
+`dismissed_comment` per alert, bovenstaande onderbouwing samengevat).
+Bevestigd ná de PATCH-aanroepen: **0 open Dependabot-alerts.**

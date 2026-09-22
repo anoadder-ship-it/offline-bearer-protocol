@@ -11,6 +11,8 @@ CoinFile v1, E2E-bewijsmatrix op devnet (14/14 + PQ-acceptatie 8/8) en
 CU-metingen (Track 1 on-chain; Track 2 v1-gemeten). Zie `STATUS.md`
 (eerste bestand bij hervatten van het werk).
 
+**Licentie:** Apache-2.0 — zie `LICENSE`. **Security:** zie `SECURITY.md`.
+
 **Canonek programma (devnet):** `8M5ruFEhFfenHSkjsUcf2FaZFKKKamJEHWRCSfttNHi6`
 (SBPF v3, met PQ-instructies; `OBP_PROGRAM_ID` env-override in alle
 scripts). Upgrade authority en mint authority leven **buiten de repo**
@@ -41,6 +43,8 @@ keys in deze git-repo.
 | `smoke-m1-*.ts` | LEGACY M1-artefacten (parameteriseerbaar via `OBP_PROGRAM_ID`) |
 | `build-sbf.sh` | SBF-build met platform-tools v1.52-pin (STATUS.md §5) |
 | `.github/workflows/` | CI: `cargo build` + `cargo test` (Rust) |
+| `SECURITY.md` | Kwetsbaarheid melden, scope, vertrouwensgrenzen |
+| `LICENSE` | Apache-2.0 (2026 Michel) |
 
 ## Trust-basis fase 1 (expliciet, geen aannames)
 

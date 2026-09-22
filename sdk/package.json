@@ -2,6 +2,7 @@
   "name": "obp-js",
   "version": "0.1.0",
   "private": true,
+  "license": "Apache-2.0",
   "description": "OBP TypeScript SDK: CoinFile-codec, ketenverificatie, instruction-builders, idempotente check-in-orchestration (SPEC: docs/coinfile-spec-v1.md)",
   "type": "module",
   "scripts": {

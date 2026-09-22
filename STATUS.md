@@ -6,8 +6,8 @@ worden. Zelfde functie en stijl als spankwallet's en active-defense' `STATUS.md`
 elke claim is of gemeten (met bewijs) of een expliciete beslissing (B-nummer) of een
 expliciete openstaande vraag (Q-nummer). Geen aannames.
 
-Laatst bijgewerkt: 2026-09-19 — M4 PQ-analyse + infrastructuur (sectie 13): negatieve benchmark-resultaten (ML-DSA-44 >1.4M CU; SLH-DSA-128f stack-overflow), architectuur-beslissing Track 1/2 (optimistische validiteit + C-port-meting), deterministische PQ-vectoren versiebaard, programma-identiteit verifieerd (beide devnet-programma's draaien dezelfde M4-PQ-build, byte-voor-byte).
-Voorafgaand: M3 E2E-bewijsmatrix devnet AFGEROND: **14/14 PASS** (sectie 12), M2 SDK + CoinFile v1 (sectie 11, 2026-09-17), M1 obp-core (sectie 9, 2026-09-17).
+Laatst bijgewerkt: 2026-09-21 (avond) — GitHub-audit afgesloten (sectie 16: geen key-lek; 9 gecommitte fixes incl. SDK-typesysteem strak + anchor-0.32.1), Dependabot-analyse (sectie 17), en docs-ronde (sectie 18): header/§8-sync, SECURITY.md, LICENSE (Apache-2.0, bevestigd door Michel), en `docs/coinfile-v2-options.md` — de **opties** voor de CoinFile-v2/Q6/Q7-beslissing, klaar om door Michel zelf te nemen (niets gekozen, niets op voortgebouwd).
+Voorafgaand: M4.1.1 Track 2-meting (sectie 15), M4.1 Track 1 + PQ-acceptatie 8/8 (sectie 14), M4 PQ-analyse (sectie 13), M3 E2E 14/14 (sectie 12), M2 SDK + CoinFile v1 (sectie 11), M1 obp-core (sectie 9).
 
 ---
 
@@ -233,13 +233,13 @@ dubbeling):
 
 Uit `SPEC.md` §12 (M0–M8), samengevat:
 
-| M | Status (2026-09-02) |
+| M | Status (2026-09-21) |
 |---|---|
-| M0 voorbereiding | **AFGEROND (2026-09-02)**: repo, keypair + 2 backups, spec v0.1, STATUS, skeleton, build groen + ID byte-geverifieerd (sectie 5), git-init + lokale commit. **Nog niet gepusht** — afwacht Q5-akkoord. |
+| M0 voorbereiding | **AFGEROND (2026-09-02)**: repo, keypair + 2 backups, spec v0.1, STATUS, skeleton, build groen + ID byte-geverifieerd (sectie 5), git-init; gepusht 2026-09-03 (Q5-akkoord). |
 | M1 programma compleet | **AFGEROND (2026-09-17)**: 10 instructies, 5/5 unit-tests, volledige devnet-lus groen (E1–E8) — sectie 9 |
 | M2 TS-client | **AFGEROND (2026-09-17)**: obp-js SDK + CoinFile spec v1, devnet-afgedwongen — sectie 11 |
 | M3 E2E-bewijsmatrix devnet (E1–E10) | **AFGEROND (2026-09-18)**: 14/14 PASS, CU-tabel + bevindingen — sectie 12 |
-| M4 PQ (implementatie + benchmark + matrix herhalen) | — |
+| M4 PQ | **Analyse + implementatie-fase 1 AFGEROND**: M4-analyse (sectie 13), M4.1 Track 1 (optimistische validiteit) + PQ-acceptatie 8/8 (sectie 14), M4.1.1 Track 2-meting (sectie 15). **M4.2** (geoptimaliseerde PQ-port, ≤1.2M CU) = bewuste research-spike — **op schort, pas bij expliciet verzoek** (Michel, 2026-09-21). |
 | M5 channels | — |
 | M6 ZK/blind-laag (optioneel) | — |
 | M7 L2-scheiding (optimistic rollup) | — |
@@ -251,8 +251,11 @@ Uit `SPEC.md` §12 (M0–M8), samengevat:
 3. ~~M1~~ — afgerond, zie sectie 9.
 4. ~~**M2**~~ — afgerond, zie sectie 11.
 5. ~~**M3**~~ — afgerond, zie sectie 12.
-6. **M2.5 (parallel)**: SpankWallet-integratie (closed actions, sectie 10).
-7. M4+: PQ (met CU-kanttekening 9.3.4), channels, ZK, L2, mainnet.
+6. **M2.5 (parallel)**: SpankWallet-integratie (closed actions, sectie 10) — afwacht Q6.
+7. **CoinFile v2 / Q6 / Q7** = product-beslissing van Michel (owner→pk-relatie
+   + key-model). Opties + afwegingen klaar in
+   `docs/coinfile-v2-options.md` — **bewust nog niets gekozen** (2026-09-21).
+8. M4.2 (PQ-port, research-spike) op schort; daarna channels, ZK, L2, mainnet.
 
 
 ## 9. M1 — obp-core compleet + devnet-smoke (AFGEROND, 2026-09-17)
@@ -1080,3 +1083,43 @@ weer verwijderd, `git diff` bevestigde byte-identiek aan de committed
 versie, en `bun test` weer volledig groen (4/4 nieuw, 28/28 totaal in de
 suite). De test controleert dus aantoonbaar iets, niet enkel decoratief
 aanwezig.
+
+## 18. Sessie 2026-09-21 (avond) — docs-ronde (afgerond) + opschorting
+
+Voorafgaand in deze dag: audit + fixes (sectie 16) en Dependabot (sectie 17)
+al gepusht. Vanavond/morgenvroeg, per prioriteitenlijst van Michel:
+
+### Afgerond (documentatie-only, laag risico)
+
+1. **Header + §8-sync** — de "waar staan we"-samenvatting klopt nu weer
+   (M4-rij + vervolgstappen; vóórheen stopte het beeld bij M4-analyse en de
+   M0-rij noemde een push die al in september 2026 plaatsvond).
+2. **`SECURITY.md`** — scope, vertrouwensgrenzen, meldingsroute (GitHub
+   Security Advisories / mail), reactietijd-doelen, bekende status
+   (Dependabot §17; ml-dsa 0.1.1 ≠ CVE-2026-24850).
+3. **`LICENSE` (Apache-2.0)** — copyright "2026 Michel"; SPDX-velden in
+   `programs/obp-core/Cargo.toml` en `sdk/package.json`. Eerste versie
+   koos zonder overleg MIT als default; **Michel heeft bevestigd:
+   Apache-2.0** (patent-clausule) — `LICENSE`, beide SPDX-velden en de
+   README-referenties zijn hierop aangepast (2026-09-21/22).
+4. **`docs/coinfile-v2-options.md`** — korte optielijst (A: pk in file /
+   B: pk on-chain / C: hybrid à la ed255222-pq) + Q7-key-model als losse as
+   + 4 expliciet-open punten. **Geen keuze, geen vooruitbouw** — ligt klaar
+   voor Michel (Q6/Q7/D6; §10, §15.4).
+
+### Buitenspel (bewust, per instructie)
+
+- **CoinFile v2 / Q6 / Q7**: product-beslissing, niet vanavond genomen.
+- **M4.2** (geoptimaliseerde PQ-port): blijft research-spike op schort.
+  Alleen bevindingen genoteerd (niet verder opgepakt): `ml-dsa` 0.1.1 =
+  niet beïnvloed door CVE-2026-24850; publiek precedent
+  `DeASI-INTERFACE/ed255222-pq` (ML-DSA-44-profiel + Solana-verificatieprogram +
+  Lean-4-spec, 2026-07, proposal-fase) geïdentificeerd als bestudeerbaar
+  voorbeeld bij de spike.
+
+### Afsluiting audit (technisch)
+
+`/// CHECK:`-safety-docs aangevuld op alle `UncheckedAccount`-velden
+(admin/pq/checkin; anchor-1.1.2 IDL-build-lint — `anchor idl build` groen),
+SDK-typesysteem strak (`tsc --noEmit` strict = 0 fouten; `bun test` 28/28;
+`cargo test` 7/7).

@@ -960,6 +960,20 @@ Alle bewijs in deze STATUS staat reproduceerbaar via de scripts in de repo
 
 ## 17. Dependabot-alerts: 4 open, alle afgewezen na bereikbaarheidsanalyse (2026-09-21)
 
+**Correctie (2026-09-22, onafhankelijke herverificatie): GitHub's Dependabot
+heeft in totaal 5 alerts gemeld voor deze repo, niet 4.** Het 5e alert
+(#5, `bigint-buffer`/CVE-2025-3194, high — hetzelfde CVE als #1, maar
+tegen `sdk/package-lock.json` i.p.v. het root-lockfile) was al vóór deze
+sectie geschreven werd automatisch op `fixed` gezet: §16.2 punt 5
+verwijderde diezelfde push de dubbele `sdk/package-lock.json` (bun.lock is
+canoniek voor de SDK), wat het alert op GitHub oploste zonder aparte actie.
+Timing bevestigd: alert #5's `fixed_at`
+(2026-09-21T16:07:06Z) valt binnen enkele seconden van commit 3c73b7a's
+tijdstip (§16, 18:06:57 CEST = 16:06:57Z). De onderstaande "4 open"-telling
+was dus correct als momentopname (#5 was al gefixt vóór deze scan liep),
+maar vermeldde #5's bestaan nooit expliciet — dat wordt hier alsnog
+vastgelegd.
+
 Push na §16 triggerde GitHub's Dependabot-scan: 4 open alerts (3 high, 1
 medium). Zelfde discipline als spankwallet STATUS.md sectie 138: per alert
 niet alleen de severity aflezen, maar de daadwerkelijke require-/aanroeppad
@@ -1043,7 +1057,9 @@ Geen patch beschikbaar upstream (`first_patched: null`, laatste release
 
 Alle 4 gedismissed via de Dependabot-API (`dismissed_reason` +
 `dismissed_comment` per alert, bovenstaande onderbouwing samengevat).
-Bevestigd ná de PATCH-aanroepen: **0 open Dependabot-alerts.**
+Bevestigd ná de PATCH-aanroepen: **0 open Dependabot-alerts.** (Zie de
+correctie bovenaan §17: dit waren 4 van in totaal 5 gemelde alerts — het
+5e, #5, was al vóór deze dismissals automatisch `fixed`.)
 
 ### 17.5 Permanente CI-bewaking van de 17.3-aanname (2026-09-21)
 

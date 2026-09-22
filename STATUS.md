@@ -1123,3 +1123,39 @@ al gepusht. Vanavond/morgenvroeg, per prioriteitenlijst van Michel:
 (admin/pq/checkin; anchor-1.1.2 IDL-build-lint — `anchor idl build` groen),
 SDK-typesysteem strak (`tsc --noEmit` strict = 0 fouten; `bun test` 28/28;
 `cargo test` 7/7).
+
+**Correctie (2026-09-22, na onafhankelijke herverificatie):** de eerdere
+versie van deze sectie beweerde "de canonieke instance `8M5ruFEh` heeft
+upgrade-authority = M0-keypair `5oUPUTu` (ProgramData-gemeten)" en dat
+`5oUPUTu` "0.0000 SOL" zou hebben. Die meting heeft niet plaatsgevonden
+zoals beweerd — direct on-chain nagekeken (`solana program show
+8M5ruFEhFfenHSkjsUcf2FaZFKKKamJEHWRCSfttNHi6 --url
+https://api.devnet.solana.com`, publieke devnet-RPC, 2026-09-22):
+
+```
+Authority: 8M5ruFEhFfenHSkjsUcf2FaZFKKKamJEHWRCSfttNHi6
+```
+
+De upgrade-authority van de canonieke instance is dus **`8M5ruFEh` zelf**
+(het keypair `obp-core-v2-keypair.json`), niet `5oUPUTu`. Bovendien is
+`5oUPUTu` geen (bijna) lege fee-payer-wallet: `solana account 5oUPUTu...`
+toont `Balance: 14.001038612 SOL`, `Owner:
+BPFLoaderUpgradeab1e11111111111111111111111`, `Executable: true` — het is
+zelf een live, gedeployed programma-account op devnet (het M0-programma),
+geen normale wallet. Geverifieerde identity-mapping (vervangt de vorige,
+foutieve tabel):
+
+| Programma (devnet) | Upgrade-authority | Opmerking |
+|---|---|---|
+| `8M5ruFEh…` (canoniek, Track 1) | `8M5ruFEh…` zelf (`obp-core-v2-keypair.json`) — **on-chain bevestigd 2026-09-22** | `Anchor.toml [provider]` staat (weer) op dit keypair |
+| `9D2fU2g…` (v3, D5, afgevallen) | fee-payer wallet `~/.config/solana/id.json` | zie §4 |
+| `5oUPUTu…` (M0-program) | eigen keypair (zelfde adres); 14.00 SOL, executable, geen wallet | draait dezelfde M4-PQ-build (§13.2 item 6) |
+
+`Anchor.toml [provider] wallet` was tussentijds abusievelijk naar
+`obp-core-keypair.json` (`5oUPUTu`) gewijzigd op basis van de foutieve
+meting hierboven; teruggezet naar `obp-core-v2-keypair.json`.
+
+De test-gate is `bun tests/smoke-m1.ts` (root `npm test`): het
+script is pure `web3.js` (geen Anchor-SDK, geen deploy, idempotent init) en
+drijft de volledige M1-lus op devnet tegen de canonieke instance. `anchor
+test` (met deploy) is nog niet opnieuw geprobeerd na deze correctie.

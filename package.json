@@ -4,7 +4,7 @@
   "private": true,
   "description": "OBP — OfflineBearer Protocol: bearer coins je volledig offline kunt halen, offline kunt overdragen en veilig weer kunt checken-in (core op Solana; L2-rolout later)",
   "scripts": {
-    "test": "anchor test"
+    "test": "bun tests/smoke-m1.ts"
   },
   "dependencies": {
     "@coral-xyz/anchor": "^0.32.1",

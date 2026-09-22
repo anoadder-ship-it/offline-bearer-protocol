@@ -13,7 +13,7 @@ obp_core = "8M5ruFEhFfenHSkjsUcf2FaZFKKKamJEHWRCSfttNHi6"
 
 [provider]
 cluster = "devnet"
-wallet = "~/.config/offline-bearer-protocol/program-keypairs/obp-core-v2-keypair.json"
+wallet = "~/.config/offline-bearer-protocol/program-keypairs/obp-core-v2-keypair.json"  # on-chain bevestigd (2026-09-22): dit keypair (pubkey 8M5ruFEh) = daadwerkelijke upgrade-authority van canoniek 8M5ruFEh
 
 [scripts]
 test = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 tests/**/*.ts"

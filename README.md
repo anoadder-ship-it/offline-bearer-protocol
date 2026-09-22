@@ -39,7 +39,7 @@ keys in deze git-repo.
 | `sdk/` | TS-SDK (bun): CoinFile-codec, ketenverificatie (incl. PQ), instruction-builders, idempotente check-in-orchestratie, `mldsa-wasm` |
 | `sdk/scripts/` | Live-bewijs: `e2e-matrix.ts` (E1–E14), `e2e-matrix-pq.ts` (F2xx), `track2-cu-benchmark.ts` (M4.1.1) |
 | `sdk/evidence/` + `sdk/fixtures/` | Bewijs-logbestanden en deterministische testvectors (M4) |
-| `tests/smoke-m1.ts` | M1-full-protocol smoke (via `anchor test`; idempotent) |
+| `tests/smoke-m1.ts` | M1-full-protocol smoke (`bun tests/smoke-m1.ts` = de root-`npm test`-gate; idempotent) |
 | `smoke-m1-*.ts` | LEGACY M1-artefacten (parameteriseerbaar via `OBP_PROGRAM_ID`) |
 | `build-sbf.sh` | SBF-build met platform-tools v1.52-pin (STATUS.md §5) |
 | `.github/workflows/` | CI: `cargo build` + `cargo test` (Rust) |

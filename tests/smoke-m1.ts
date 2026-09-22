@@ -23,7 +23,9 @@ const TOKEN_PROGRAM_ID = spl.TOKEN_PROGRAM_ID;
 const SYS = web3.SystemProgram.programId;
 const connection = new web3.Connection('https://api.devnet.solana.com', 'confirmed');
 
-const SERIAL = Buffer.from(sha256(Buffer.from('obp-m1-smoke-coin-001')));
+// Per-run nonce → verse coin per run: her-runs op de gedeelde devnet-instance blijven groen.
+const RUN_ID = String(Date.now()).slice(-6);
+const SERIAL = Buffer.from(sha256(Buffer.from('obp-m1-smoke-coin-' + RUN_ID)));
 const VALUE = 100;
 const BPS = 10_000; // bond = 100%
 const WINDOW_SLOTS = 10;
@@ -54,10 +56,15 @@ const s = (k: web3.PublicKey, isW = false) => ({ pubkey: k, isWritable: isW, isS
 const payer = web3.Keypair.fromSecretKey(
   Uint8Array.from(JSON.parse(fs.readFileSync(process.env.HOME + '/.config/solana/id.json', 'utf8'))),
 );
-const mintAuthority = web3.Keypair.generate();
-const recipient = web3.Keypair.generate(); // bearer: owner state_0 + eerste checker
-const holder2 = web3.Keypair.generate();   // offline overdracht 1
-const holder3 = web3.Keypair.generate();   // offline overdracht 2 = final_owner
+// Deterministische identiteiten (zelfde SEED-patroon als sdk/scripts/e2e-matrix.ts):
+// de gedeelde devnet-config is geinit met deze mintAuthority — per-run
+// Keypair.generate() zou op die instance faalen (NotMintAuthority / allowance-mismatch).
+const SEED = Buffer.from('obp-smoke-deterministic-seed-2025');
+const derive = (s: string) => web3.Keypair.fromSeed(sha256(Buffer.concat([SEED, Buffer.from(s, 'utf8')])));
+const mintAuthority = derive('mint-authority');
+const recipient = derive('recipient'); // bearer: owner state_0 + eerste checker
+const holder2 = derive('holder2');     // offline overdracht 1
+const holder3 = derive('holder3');     // offline overdracht 2 = final_owner
 
 // State (SPEC §3.2): serial(32) ‖ value(8 LE) ‖ owner(32) ‖ prevH(32) = 104B
 function makeState(owner: web3.PublicKey, prevH: Buffer): Buffer {
@@ -136,9 +143,14 @@ async function main() {
   const [headPda] = pda('head', SERIAL);
   const [allowancePda] = pda('allowance', pk(recipient.publicKey));
 
-  // SPL mint + alle benodigde ATAs
-  const mint = await spl.createMint(connection, payer, mintAuthority.publicKey, null, 0);
-  console.log('mint:', mint.toBase58());
+  // Vault-mint: uit de gedeelde config lezen (canonieke devnet-instance), anders nieuw.
+  // (config-layout: 8B disc ‖ mint_authority@8 ‖ vault_mint@40 ‖ … — state.rs Config.)
+  const cfgBefore = await connection.getAccountInfo(cfgPda);
+  const hasConfig = !!cfgBefore && cfgBefore.data.length > 0;
+  const mint = hasConfig
+    ? new web3.PublicKey(cfgBefore.data.subarray(40, 72))
+    : await spl.createMint(connection, payer, mintAuthority.publicKey, null, 0);
+  console.log('mint:', mint.toBase58(), hasConfig ? '(config.vault_mint — gedeelde instance)' : '(nieuw)');
   const mintAuthATA = spl.getAssociatedTokenAddressSync(mint, mintAuthority.publicKey, true);
   const vaultATA = spl.getAssociatedTokenAddressSync(mint, vaultPda, true);
   const feeSinkATA = spl.getAssociatedTokenAddressSync(mint, feePda, true);
@@ -159,7 +171,6 @@ async function main() {
     u16le(MAX_LINKS),          // max_links_per_tx (u16)
     u64le(DEFAULT_ALLOWANCE),  // default_allowance
   ]);
-  const cfgBefore = await connection.getAccountInfo(cfgPda);
   if (cfgBefore && cfgBefore.data.length > 0) {
     console.log('  config bestaat al — init overgeslagen (idempotent)');
   } else {

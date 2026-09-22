@@ -9,6 +9,13 @@ expliciete openstaande vraag (Q-nummer). Geen aannames.
 Laatst bijgewerkt: 2026-09-21 (avond) — GitHub-audit afgesloten (sectie 16: geen key-lek; 9 gecommitte fixes incl. SDK-typesysteem strak + anchor-0.32.1), Dependabot-analyse (sectie 17), en docs-ronde (sectie 18): header/§8-sync, SECURITY.md, LICENSE (Apache-2.0, bevestigd door Michel), en `docs/coinfile-v2-options.md` — de **opties** voor de CoinFile-v2/Q6/Q7-beslissing, klaar om door Michel zelf te nemen (niets gekozen, niets op voortgebouwd).
 Voorafgaand: M4.1.1 Track 2-meting (sectie 15), M4.1 Track 1 + PQ-acceptatie 8/8 (sectie 14), M4 PQ-analyse (sectie 13), M3 E2E 14/14 (sectie 12), M2 SDK + CoinFile v1 (sectie 11), M1 obp-core (sectie 9).
 
+Document laatst bijgewerkt: 2026-09-22 (zie sectie 17 en de correctieparagraaf
+in sectie 18 voor de recentste stand). De regel hierboven dekt zelf de
+2026-09-21-avondsessie; sindsdien zijn twee foutieve claims uit die sessie
+rechtgezet (§17: Dependabot-telling 4→5; §18: de upgrade-authority-claim) —
+voor de actuele stand is het chronologische logboek leidend, niet de regel
+hierboven.
+
 ---
 
 ## 1. Herkomst: van Grok-chat naar bouwbaar project

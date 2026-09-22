@@ -99,7 +99,7 @@ De documentatie gebruikt korte codes; dit is wat ze betekenen.
 
 ## Werkwijze
 
-AI-gesupported ontwikkeling (Qwen 3.8 27B uncensored via orcarouter; MCP-tools: Solana-RPC, GitHub, file-system, shell, zoekopdrachten). Elke claim in `STATUS.md` is reproduceerbaar via de scripts in deze repo — de AI is een uitvoerder, het bewijs is het criterium.
+AI-gesupported ontwikkeling (een LLM; MCP-tools: Solana-RPC, GitHub, file-system, shell, zoekopdrachten). Elke claim in `STATUS.md` is reproduceerbaar via de scripts in deze repo — de AI is een uitvoerder, het bewijs is het criterium.
 
 ## Disclaimer
 

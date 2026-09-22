@@ -961,7 +961,7 @@ lus op devnet, idempotent) her-gevalideerd na de anchor-0.32.1-bump.
 ### 16.3 Tooling-provenance (wie/wat doet het werk)
 
 Sinds de M4.1.1-sessie (2026-09-20) tot deze audit (2026-09-21) loopt het
-ontwikkelwerk via **Qwen 3.8 27B (uncensored)** via **orcarouter**, met MCP-
+ontwikkelwerk via een LLM, met MCP-
 tools: `solana-mcp` (RPC: balances, transacties, Jupiter-quotes, stake,
 validators), `github-mcp` (repo/commits/PRs), `cardano-mcp`, `file-system-mcp`,
 `shell-mcp`, `google-mcp` (SerpApi), `js-code-sandbox` (deno), `rag-v1`.

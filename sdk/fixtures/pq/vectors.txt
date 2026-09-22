@@ -1,7 +1,7 @@
 # OBP M4 PQ vectors v1 — deterministisch (geen RNG).
 # Generator: programs/obp-core/examples/gen-pq-vectors.rs (cargo run --example gen-pq-vectors).
 # MASTER_SEED = sha256("obp pq vector gen v1"); expansie = sha256(seed ‖ domain ‖ u32 LE counter).
-# ML-DSA-44 (FIPS 203): deterministic sign, ctx="".
+# ML-DSA-44 (FIPS 204): deterministic sign, ctx="".
 # SLH-DSA-SHA2-128f (FIPS 205): slh_keygen_internal + slh_sign_internal(opt_rand=None, deterministisch).
 # MSG = "obp m4 pq benchmark message v1" (ascii).
 MASTER_SEED=eb30f8324c69f58432bdfc57b6ec4ddfa005e2e0474e7a0d13cf100dcc884b9e

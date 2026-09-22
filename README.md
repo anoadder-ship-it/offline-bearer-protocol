@@ -6,14 +6,26 @@ checken-in** — zonder double-spend: elke double-spend is of onmogelijk
 (nullifier) of economisch begrensd en gecompenseerd (verplichte bonds ≥ 100%
 van de muntwaarde).
 
-**Status:** M4.1.1 — program (Anchor, SBPF v3 + post-quantum), TS-SDK,
-CoinFile v1, E2E-bewijsmatrix op devnet (14/14 + PQ-acceptatie 8/8) en
-CU-metingen (Track 1 on-chain; Track 2 v1-gemeten). Zie `STATUS.md`
-(eerste bestand bij hervatten van het werk).
+> **Experimenteel — alleen devnet — niet voor echte waarde.** OBP is een
+> onderzoeksprototype. Het draait uitsluitend op Solana-devnet (testgeld zonder
+> waarde), is niet geaudit en is niet productieklaar. Gebruik het niet met
+> echte fondsen.
+
+**Status:** een werkend prototype op devnet, bestaande uit:
+
+- het on-chain programma (Anchor/Rust) dat check-ins, double-spend-resolutie
+  en bonds afdwingt, inclusief optionele post-quantum-handtekeningen (ML-DSA);
+- een TypeScript-SDK en het offline munt-bestandsformaat (CoinFile v1);
+- een end-to-end testreeks op devnet: alle 14 protocolscenario's slagen
+  (E-serie), plus 8/8 post-quantum-acceptatietests;
+- metingen van de rekenkosten (compute units, CU) van post-quantum-verificatie.
+
+Het project staat bij mijlpaal M4 van M0–M8 (zie *Begrippen* hieronder).
+Het volledige werklogboek staat in `STATUS.md`.
 
 **Licentie:** Apache-2.0 — zie `LICENSE`. **Security:** zie `SECURITY.md`.
 
-**Canonek programma (devnet):** `8M5ruFEhFfenHSkjsUcf2FaZFKKKamJEHWRCSfttNHi6`
+**Canoniek programma (devnet):** `8M5ruFEhFfenHSkjsUcf2FaZFKKKamJEHWRCSfttNHi6`
 (SBPF v3, met PQ-instructies; `OBP_PROGRAM_ID` env-override in alle
 scripts). Upgrade authority en mint authority leven **buiten de repo**
 onder `~/.config/offline-bearer-protocol/` (STATUS.md §4) — geen private
@@ -55,11 +67,44 @@ keys in deze git-repo.
   coins, begrensd door de vault — 1:1 backende, invariant I2
   machine-checkbaar.
 - **A4 (M4):** PQ-signalering via `config.sig_scheme` + per-coin raw
-  public key (FIPS 203/205); fase 1 = signalering + off-chain verificatie
+  public key (FIPS 204/205); fase 1 = signalering + off-chain verificatie
   (SDK), Track 2 (on-chain verificatie) = CU-budget-vraag (STATUS §13/§15).
 
 Volledige trust-tabel en threat model: `SPEC.md` §2 en §9.
 
+## Begrippen
+
+De documentatie gebruikt korte codes; dit is wat ze betekenen.
+
+- **M0–M8 — mijlpalen** (roadmap, `SPEC.md` §12): M0 repo-opzet · M1 on-chain
+  programma · M2 TypeScript-SDK · M3 end-to-end-tests op devnet · M4
+  post-quantum-handtekeningen · M5 channels · M6 optionele ZK/privacy-laag ·
+  M7 L2-scheiding (optimistic rollup) · M8 mainnet-voorbereiding (multisig,
+  audits, bug bounty). M0–M4 fase 1 zijn gedaan (M4.2 staat on hold); M5–M8
+  niet begonnen.
+- **Track 1 / Track 2 — twee routes voor post-quantum-verificatie (M4):**
+  Track 1 legt on-chain alleen een commitment (hash) van de handtekening vast en
+  verifieert de handtekening zelf off-chain in de SDK (in gebruik). Track 2
+  verifieert volledig on-chain; dat is gemeten maar past nog niet binnen
+  Solana's rekenbudget, en is daarom een onderzoeksvraag.
+- **E1–E14 / F2xx — testscenario's:** de E-serie is de end-to-end-testreeks
+  van het protocol (normale check-in, double-spend, dispute, enz.); de F-serie
+  zijn de post-quantum-varianten daarvan.
+- **A1–A4** — vertrouwensaannames (hierboven). **B-, D-, Q-nummers** —
+  genummerde beslissingen en open vragen in `STATUS.md`. **C1–C6** —
+  correcties op het oorspronkelijke ontwerp (`docs/obp-analysis.md`).
+- **CU** — compute units, Solana's maat voor rekenkosten per transactie.
+  **SBPF v3** — versie van Solana's bytecode-formaat voor programma's.
+  **PQ** — post-quantum.
+
 ## Werkwijze
 
 AI-gesupported ontwikkeling (Qwen 3.8 27B uncensored via orcarouter; MCP-tools: Solana-RPC, GitHub, file-system, shell, zoekopdrachten). Elke claim in `STATUS.md` is reproduceerbaar via de scripts in deze repo — de AI is een uitvoerder, het bewijs is het criterium.
+
+## Disclaimer
+
+Deze software wordt geleverd "as is", zonder garantie (zie ook de
+Apache-2.0-licentie zelf). OBP is experimentele software die alleen op devnet
+draait — gebruik op eigen risico. Dit is geen financieel advies, en er is geen
+garantie tegen bugs, verlies van munten of toegang, of andere risico's die
+inherent zijn aan het beheren van crypto-assets.

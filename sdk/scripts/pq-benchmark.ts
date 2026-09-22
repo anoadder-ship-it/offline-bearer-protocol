@@ -1,5 +1,5 @@
 // M4 (PQ, B8): CU/bytes-benchmark voor in-program PQ-verificatie.
-// Meet de echte on-chain CU-kosten van ML-DSA-44 (FIPS 203) + SLH-DSA-SHA2-128f (FIPS 205).
+// Meet de echte on-chain CU-kosten van ML-DSA-44 (FIPS 204) + SLH-DSA-SHA2-128f (FIPS 205).
 // Data (pk/msg/sig) wordt per scheme in een eigen account gevuld via pq_write_data-chunks.
 // Meting: ruwe simulateTransaction met setComputeUnitLimit(1.4M) → CU + error + logs,
 // zodat we ook "exceeded CUs" (>1.4M = niet haalbaar in één tx) kunnen vastleggen.
@@ -84,7 +84,7 @@ async function main() {
   console.log(`\nBASELINE (ping + cu-limit, simulatie): CU=${baseCu}`);
 
   const schemes = [
-    { name: 'ML-DSA-44 (FIPS 203)', scheme: 1, data: buildData(V['MLDSA44_PK'], V['MLDSA44_SIG']) },
+    { name: 'ML-DSA-44 (FIPS 204)', scheme: 1, data: buildData(V['MLDSA44_PK'], V['MLDSA44_SIG']) },
     { name: 'SLH-DSA-SHA2-128f (FIPS 205)', scheme: 2, data: buildData(V['SLH_PK'], V['SLH_SIG']) },
   ];
 

@@ -1,4 +1,4 @@
-// M4.1 (D3): ML-DSA-44 (FIPS 203, L2) voor de SDK — via mldsa-wasm (WASM, zero-dep).
+// M4.1 (D3): ML-DSA-44 (FIPS 204, L2) voor de SDK — via mldsa-wasm (WASM, zero-dep).
 // Cross-gevalideerd tegen de RustCrypto-vectors in fixtures/pq/vectors.txt
 // (bun test → tests/pq-chain.test.ts).
 //

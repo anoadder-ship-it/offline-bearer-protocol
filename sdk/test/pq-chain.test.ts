@@ -28,7 +28,7 @@ describe('PQ: cross-verify RustCrypto-vectors (fixtures/pq/vectors.txt)', () => 
   const pk = Buffer.from(V.MLDSA44_PK, 'hex');
   const sig = Buffer.from(V.MLDSA44_SIG, 'hex');
   const msg = Buffer.from(V.MSG, 'hex');
-  test('pk/sig lengtes (FIPS 203 L2)', () => {
+  test('pk/sig lengtes (FIPS 204 L2)', () => {
     expect(pk.length).toBe(1312);
     expect(sig.length).toBe(2420);
   });

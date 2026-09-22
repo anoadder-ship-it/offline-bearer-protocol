@@ -1,7 +1,7 @@
 //! M4 (PQ, B8): deterministische PQ-testvectoren voor de CU-benchmark.
 //!
 //! Reproduceerbaar: geen RNG — alles afgeleid van MASTER_SEED (32 B).
-//!   - ML-DSA-44 (FIPS 203): z0 (32 B) = sha256-expansie(MASTER_SEED, "mldsa44-z0").
+//!   - ML-DSA-44 (FIPS 204): z0 (32 B) = sha256-expansie(MASTER_SEED, "mldsa44-z0").
 //!   - SLH-DSA-SHA2-128f (FIPS 205): (sk_seed, sk_prf, pk_seed) = elk 16 B
 //!     via sha256-expansie(MASTER_SEED, <domain>).
 //! Uitvoer: `sdk/fixtures/pq/vectors.txt` (KEY=hex-lijst; gelezen door
@@ -47,12 +47,12 @@ fn main() {
     let master: [u8; 32] = hashv(&[b"obp pq vector gen v1"]).to_bytes();
     let msg = b"obp m4 pq benchmark message v1";
 
-    // ---- ML-DSA-44 (FIPS 203) ----
+    // ---- ML-DSA-44 (FIPS 204) ----
     use ml_dsa::{Keypair as MlKeypair, MlDsa44, Seed, Signature, Signer as _, VerifyingKey, Verifier, SigningKey};
     let z0 = expand(&master, "mldsa44-z0", 32);
     let seed = Seed::try_from(z0.as_slice()).expect("Seed = 32B");
     let sk = SigningKey::<MlDsa44>::from_seed(&seed);
-    let sig: Signature<MlDsa44> = sk.sign(msg); // Signer::sign = deterministische ML-DSA-sign (FIPS 203); onfeilbaar -> geen Result
+    let sig: Signature<MlDsa44> = sk.sign(msg); // Signer::sign = deterministische ML-DSA-sign (FIPS 204); onfeilbaar -> geen Result
     let mldsa_pk = sk.verifying_key().encode().to_vec();
     let mldsa_sig = sig.encode().to_vec();
     assert_eq!(mldsa_pk.len(), 1312, "ML-DSA-44 pk-len");
@@ -86,7 +86,7 @@ fn main() {
     t.push_str(r#"# OBP M4 PQ vectors v1 — deterministisch (geen RNG).
 # Generator: programs/obp-core/examples/gen-pq-vectors.rs (cargo run --example gen-pq-vectors).
 # MASTER_SEED = sha256("obp pq vector gen v1"); expansie = sha256(seed ‖ domain ‖ u32 LE counter).
-# ML-DSA-44 (FIPS 203): deterministic sign, ctx="".
+# ML-DSA-44 (FIPS 204): deterministic sign, ctx="".
 # SLH-DSA-SHA2-128f (FIPS 205): slh_keygen_internal + slh_sign_internal(opt_rand=None, deterministisch).
 # MSG = "obp m4 pq benchmark message v1" (ascii).
 "#);

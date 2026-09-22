@@ -28,9 +28,11 @@ Deze policy dekt de code in deze repository:
 
 ## Kwetsbaarheid melden
 
-1. **Privé eerst**: gebruik GitHub Security Advisories
-   (`Security → Advisories → New draft`) of mail Michel
-   (contact via de repo/commits in deze omgeving). Vermeld: welk onderdeel
+1. **Privé eerst — niet via een publiek issue.** Gebruik GitHub's private
+   vulnerability reporting: tab **Security → Report a vulnerability** in deze
+   repository. Werkt die knop niet, open dan een publiek issue met alleen de
+   vraag om een privé-contactkanaal (zonder details van de kwetsbaarheid);
+   de maintainer reageert daarop met een privé-route. Vermeld: welk onderdeel
    (programma / SDK / spec), reproduceerbaar voorbeeld of invariant dat
    schiet, en — indien bekend — het impact-scenario (value-migratie,
    double-spend, bond-lek).
@@ -44,14 +46,14 @@ Deze policy dekt de code in deze repository:
    is dan primair een spec/programma-kwestie vóór de mainnet-prep (M8),
    niet een incident.
 4. Na een fix: changelog-vermelding in `STATUS.md` (nieuw sectienummer) en,
-   indien relevant, een Dependabot/Renovate-achtse notitie bij
+   indien relevant, een Dependabot/Renovate-achtige notitie bij
    `SECURITY.md` of in de issue.
 
-## Bekende status (peildatum 2026-09-21)
+## Bekende status (peildatum 2026-09-22)
 
-- **Dependabot**: 4 alerts geanalyseerd, 0 acceptabel-open (3× not_used,
-  1× tolerable_risk met bewijs) — STATUS.md §17.
-- **ml-dsa 0.1.1**: CVE-2026-24850 (duplicate hint indices, beïnvloedt
-  `< 0.1.1`) — wij pinnen 0.1.1, niet beïnvloed.
-- **Repo-zichtbaarheid**: nu private; deze `SECURITY.md` + `LICENSE` zijn de
-  laatste stappen vóór publicatie (beslissing: Michel, zie STATUS.md §18).
+- **Dependabot**: 5 alerts in totaal, 0 open — 1× `fixed` (#5, bigint-buffer),
+  4× `dismissed` na analyse (3× not_used, 1× tolerable_risk met bewijs) —
+  STATUS.md §17.
+- **ml-dsa 0.1.1** (ML-DSA, FIPS 204): CVE-2026-24850 (duplicate hint indices;
+  getroffen versies `0.0.4` t/m `< 0.1.0-rc.4`) — wij pinnen 0.1.1, niet
+  getroffen.

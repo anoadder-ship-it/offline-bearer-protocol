@@ -396,7 +396,7 @@ Regels:
   (CU-kosten: meten bij M1 — niet aannemen; verwachting: enkele duizenden CU,
   te verifiëren in de devnet-transactielogs).
 - **Fase 2: post-kwantum, gemeten.** Kandidaten: **ML-DSA-44** (FIPS 204; pubkey
-  1152 B, sig 2420 B) en **SLH-DSA-SHA2-128f** (FIPS 205; pubkey 32 B, sig 1697 B).
+  1312 B, sig 2420 B) en **SLH-DSA-SHA2-128f** (FIPS 205; pubkey 32 B, sig 17 088 B).
   Benchmark op devnet: (a) CU per verificatie (pure Rust, geen syscall → verwachting
   veel hogere CU per link → `max_links_per_tx` daalt, meer tx's per check-in),
   (b) bytes per link (tx-size 1232 B), (c) client-side teken-snelheid.

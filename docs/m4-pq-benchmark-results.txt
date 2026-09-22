@@ -2,7 +2,7 @@ M4-PQ-BENCHMARK RESULTATEN (devnet, 2025)
 Program: 9D2fU2g13Y55uvk6kLiHRknxd6rzu84nsHy6gnjTLqzt (obp-core, SBFv3, 621336 B met PQ-code)
 Baseline (ping + setComputeUnitLimit(1.4M), simulatie): CU=3158
 
-=== ML-DSA-44 (FIPS 203) ===
+=== ML-DSA-44 (FIPS 204) ===
 data-account: 3770 B (pk_len(4)+pk(1312)+msg_len(4)+msg(30)+sig(2420))
 RESULT: FAIL — "exceeded CUs meter at BPF instruction" bij CU=1,399,850 (het max per tx)
 → ML-DSA-44 verificatie kost > 1.4M CU → MEER dan Solana's MAX_COMPUTE_UNIT_LIMIT (1_400_000).

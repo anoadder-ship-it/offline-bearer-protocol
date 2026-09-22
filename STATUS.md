@@ -141,8 +141,7 @@ De staging-map wordt na elke overdracht geruimd via `python3 -c "import shutil; 
   program-ID als upgrade authority (geen multisig in fase 1, B2/M8) → één verloren
   bestand = voorgoed niet te upgraden. Vandaar twee exemplaren, beide buiten de
   repo-checkout. Elke actie die de `~/.config/offline-bearer-protocol/`-map of
-  (backup buiten de repo; locatie niet gepubliceerd) zou kunnen wissen, controleert
-  beide eerst.
+  de backup-locatie zou kunnen wissen, controleert beide eerst.
 - **`target/deploy/obp_core-keypair.json`** wordt een symlink naar de werkende
   locatie (geen kopie) — aangemaakt bij de eerste build (M0).
 - **Werkprogramma devnet (M1–M3): `9D2fU2g13Y55uvk6kLiHRknxd6rzu84nsHy6gnjTLqzt`**
@@ -254,7 +253,7 @@ Uit `SPEC.md` §12 (M0–M8), samengevat:
 
 **Vervolgstappen (volgorde):**
 1. ~~Q1–Q5 beantwoorden~~ — akkoord 2026-09-03 ("akkord met alles").
-2. ~~M0 push~~ — gedaan (commit 346a95a, main).
+2. ~~M0 push~~ — gedaan (commit 8d06132, main).
 3. ~~M1~~ — afgerond, zie sectie 9.
 4. ~~**M2**~~ — afgerond, zie sectie 11.
 5. ~~**M3**~~ — afgerond, zie sectie 12.
@@ -638,8 +637,12 @@ Program `9D2fU2g…` (621336 B, SBPF v3, met in-program PQ-code), simulatie met
 Build-time: frame-warnings mldsa44_verify ≈62 KB, slhdsa128f_verify ≈43 KB
 (per-functielimiet 4096 B — linker waarschuwt; de runtime-1MB-stack is de harde muur).
 
-**Doc-fix (bewijs: NIST, aug 2024):** ML-DSA = **FIPS 203** (niet 204 — FIPS 204 =
-ML-KEM). De M4-bestanden + `pq.rs`-comment noemen foutief 204.
+**Doc-fix (gecorrigeerd 2026-09-22):** ML-DSA = **FIPS 204**, ML-KEM = FIPS 203,
+SLH-DSA = FIPS 205 (NIST, aug 2024). De eerdere "doc-fix" op deze plek beweerde
+het omgekeerde (ML-DSA = FIPS 203, FIPS 204 = ML-KEM) en was zelf fout: de
+oorspronkelijke vermeldingen van 204 waren juist. Alle ML-DSA-verwijzingen in de
+repo (README, `Cargo.toml`, `pq.rs`, `gen-pq-vectors.rs`, SDK, tests, fixtures,
+benchmark-tekst, deze STATUS) zijn teruggezet naar FIPS 204.
 
 ### 13.2 Gemeten context-facten (deze sessie, bron gecontroleerd)
 
@@ -669,7 +672,7 @@ ML-KEM). De M4-bestanden + `pq.rs`-comment noemen foutief 204.
    `5oUPUTu…` (programdata 67tvdard…; ELF 625728 B = M4-PQ-build 621336 B + 4392 B
    nul-padding) en `9D2fU2g…` (programdata 9wdyFKDV…; ELF 621336 B, sha256
    69562517…). ELF5[:621336] == ELF9 → **dezelfde M4-PQ-build**. M3-matrix liep op
-   **9D2fU2g** (bewijs: constants.ts @ 417125a wijst daarop; §12-correg). Lokale
+   **9D2fU2g** (bewijs: constants.ts @ c633b72 wijst daarop; §12-correg). Lokale
    `target/deploy/obp_core.so` (515584 B) is een ander artifact van dezelfde
    build-run (cargo-post-processing; niet-deployed). Conclusie: de
    "5oUPUTu vs 9D2fU2g"-inconsistentie was alleen een doc-kwestie (§12) + de
@@ -702,7 +705,7 @@ te kunnen buiten — wat de architectuurroute opent:
 - Program-wijziging: klein (constraint `{0,1}`; optioneel sigCommit, R2).
 
 **Track 2 — C-geoptimaliseerde ML-DSA-44 in-program (meting M4.1, upgrade-pad):**
-- FIPS 203 reference-C (portable path, geen SIMD) op SBF; statische arrays
+- FIPS 204 reference-C (portable path, geen SIMD) op SBF; statische arrays
   (kleine frames) i.p.v. de RustCrypto-locals.
 - Meten op **local validator** (standaard CU-model, 1.4M budget) — de devnet-
   fee-model is een cluster-instelling, geen VM-eigenschap.
@@ -720,7 +723,7 @@ states aan de offline-signaturen; een in dispute geüploade signature moet
 `H(sig) == sigCommit` voldoen → deterministische in-program-resolutie mogelijk.
 Trade-off: layout-wijziging vóór mainnet (nu nog gratis; devnet-state reset).
 
-**Schema-keuze (aanbeveling):** **ML-DSA-44** als PQ-referentie (FIPS 203;
+**Schema-keuze (aanbeveling):** **ML-DSA-44** als PQ-referentie (FIPS 204;
 sig 2420 B; pk 1312 B — kleinste FIPS-sig; device-verificatie ≈ ms).
 SLH-DSA (sig 7.8–17 KB) uit fase-1-scope; `sig_scheme=2` gereserveerd.
 
@@ -730,7 +733,7 @@ SLH-DSA (sig 7.8–17 KB) uit fase-1-scope; `sig_scheme=2` gereserveerd.
 |---|------------|--------|
 | D1 | PQ-route | Track 1 = fase-1-PQ-design (optimistische validiteit). Track 2 = parallel upgrade-pad (C-port ML-DSA-44 meting). |
 | D2 | Dispute-default | Validity-challenge → "stuck, not stolen": waarde blijft in vault; REJECTED na tweede window; bonds terug. Optionele mint-authority-override later, niet in MVP. |
-| D3 | Schema | ML-DSA-44 (FIPS 203) = PQ-referentie (`sig_scheme=1`). SLH-DSA uit fase-1-scope (`sig_scheme=2` gereserveerd). |
+| D3 | Schema | ML-DSA-44 (FIPS 204) = PQ-referentie (`sig_scheme=1`). SLH-DSA uit fase-1-scope (`sig_scheme=2` gereserveerd). |
 | D4 | R2 sigCommit | Ja: per-link `sigCommit = H(sig)[0..32]` in Submission (+128 B). Layout nu, vóór mainnet. |
 | D5 | Opruiming | (a) M3-commit pushen. (b) Canoniek programma = `5oUPUTu…` voor Track 1; SDK daarop wijzen; `9D2fU2g…` documenteren als afgevallen. (c) PQ-vectoren in `sdk/fixtures/pq/` versioneren. |
 | D6 | Volgorde | Eerst M4.1 Track 1 (SPEC + program + SDK + matrix met PQ-coin); daarna Track 2-meting. |
@@ -766,7 +769,7 @@ historisch (details + bewijs: §14.2).
 - **ML-DSA JS:** `mldsa-wasm@0.0.4` (zero-dep, WASM) in de SDK; cross-gevalideerd
   tegen de RustCrypto-vectors uit `sdk/fixtures/pq/vectors.txt` (verify=true,
   corrupt-sig=false, wrong-msg=false, roundtrip 2420 B, ~10 ms/verify).
-  Kenmerk (gedocumenteerd): sign is **niet-deterministisch** (mu/tr per FIPS 203)
+  Kenmerk (gedocumenteerd): sign is **niet-deterministisch** (mu/tr per FIPS 204)
   → commitment op de exacte sig-bytes is geluid (zelfde semantic als Ed25519).
 
 ### 14.2 Beslissingen & afwijkingen
@@ -780,8 +783,8 @@ historisch (details + bewijs: §14.2).
   → **Nieuw canoniek v2-instance:** `8M5ruFEhFfenHSkjsUcf2FaZFKKKamJEHWRCSfttNHi6`
   (volledig vers; config met deterministische keys; 14/14).
   §4-conventie vol: keypair in `~/.config/offline-bearer-protocol/program-keypairs/
-  obp-core-v2-keypair.json` (600) + byte-identieke backup
-  ((backup buiten de repo; locatie niet gepubliceerd), incl. seed-hex, 600).
+  obp-core-v2-keypair.json` (600) + byte-identieke backup buiten de repo
+  (locatie niet gepubliceerd; incl. seed-hex, 600).
   `5oUPUTu…` + `9D2fU2g…` = historische devnet-instances (M3-bewijs blijft geldig;
   9D2fU2g draait de Track 1-build met 3 on-gesloten M3-coins — acceptabel, devnet).
 - **PQ-testinstance:** `6YLEj7ywUALhoUS5uNFkdp8docvyoEgYQ2ZoqF1GfgVF`
@@ -975,7 +978,7 @@ sectie geschreven werd automatisch op `fixed` gezet: §16.2 punt 5
 verwijderde diezelfde push de dubbele `sdk/package-lock.json` (bun.lock is
 canoniek voor de SDK), wat het alert op GitHub oploste zonder aparte actie.
 Timing bevestigd: alert #5's `fixed_at`
-(2026-09-21T16:07:06Z) valt binnen enkele seconden van commit 3c73b7a's
+(2026-09-21T16:07:06Z) valt binnen enkele seconden van commit f13e77a's
 tijdstip (§16, 18:06:57 CEST = 16:06:57Z). De onderstaande "4 open"-telling
 was dus correct als momentopname (#5 was al gefixt vóór deze scan liep),
 maar vermeldde #5's bestaan nooit expliciet — dat wordt hier alsnog

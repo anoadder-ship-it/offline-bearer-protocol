@@ -2,7 +2,7 @@ use anchor_lang::prelude::*;
 
 use crate::errors::ObpError;
 
-/// M4 (PQ, B8): in-program verificatie van FIPS 203 ML-DSA-44 + FIPS 205 SLH-DSA-128f.
+/// M4 (PQ, B8): in-program verificatie van FIPS 204 ML-DSA-44 + FIPS 205 SLH-DSA-128f.
 ///
 /// De ed25519-route blijft via de native precompile (2400 CU/verify). PQ heeft géén
 /// native Solana-precompile → verificatie in het programma (Rust). De CU-kosten worden
@@ -12,7 +12,7 @@ use crate::errors::ObpError;
 /// Data-layout van de `data`-account: `pk_len(4 LE) ‖ pk(pk_len) ‖ msg_len(4 LE) ‖
 /// msg(msg_len) ‖ sig(rest)`.
 
-/// ML-DSA-44 (FIPS 203, Level 2): verify over `msg` met publieke key `pk`.
+/// ML-DSA-44 (FIPS 204, Level 2): verify over `msg` met publieke key `pk`.
 #[inline(never)]
 pub fn mldsa44_verify(pk: &[u8], msg: &[u8], sig: &[u8]) -> bool {
     use ml_dsa::{EncodedVerifyingKey, MlDsa44, Signature, VerifyingKey};

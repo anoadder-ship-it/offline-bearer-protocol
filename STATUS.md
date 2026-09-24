@@ -1185,3 +1185,76 @@ De test-gate is `bun tests/smoke-m1.ts` (root `npm test`): het
 script is pure `web3.js` (geen Anchor-SDK, geen deploy, idempotent init) en
 drijft de volledige M1-lus op devnet tegen de canonieke instance. `anchor
 test` (met deploy) is nog niet opnieuw geprobeerd na deze correctie.
+
+## 19. Aantekening voor de volgende ontwerpronde: Alpenglow en het challenge-window in slots (2026-09-24)
+
+Alleen een notitie, geen codewijziging.
+
+Solana's consensusupgrade Alpenglow staat sinds 2026-09-23 op het publieke testnet.
+Devnet en mainnet-beta volgen later ("Q3 2026" volgens solana.com, nog geen datum).
+Votor vervangt TowerBFT. Het rekenmodel, de transacties en het accountmodel blijven
+gelijk. De finaliteit gaat van ~12,8 s naar ~150 ms. De slottijd gaat los daarvan in
+stappen van 400 naar 200 ms (SIMD-0525 loopt al; de bronnen verschillen over de exacte
+stappen, dus live meten).
+
+**Wat dat hier raakt:** `Config.challenge_window_slots` (init-argument, gebruikt in
+`finalize_check_in` en bij het verlopen van het window in `checkin.rs`). Een vast
+slotaantal geeft bij kortere slots een korter window in werkelijke tijd. Op devnet is
+het nu 10 slots, en dat was al te kort (herstelplan, beslispunt 5).
+
+**Voor de volgende ontwerpronde:**
+- Het window vastleggen als een bedoelde werkelijke tijdsduur en het slotaantal daaruit
+  afleiden bij init, met live gemeten slottijd plus marge. Documenteren dat het getal
+  opnieuw moet worden bepaald bij elke wijziging van de slottijd.
+- T7 (SPEC: "alleen SLOTS", vanwege clock-skew) opnieuw toetsen. Onder Alpenglow zet
+  de leider zelf de tijdstempel van zijn blok binnen een marge. Dat verandert de
+  afweging tussen slots en `unix_timestamp`, maar maakt `unix_timestamp` niet vanzelf
+  veilig. Eerst de exacte marge uitzoeken.
+
+Bron: https://solana.com/upgrades/alpenglow
+
+## 20. Spoor A uitgevoerd: oude devnet-instances gesloten (2026-09-24)
+
+Alle vijf oude OBP-programma's op devnet zijn gesloten met `solana program close`, na
+akkoord van Michel. Vóór elk commando is gecontroleerd dat de on-chain upgrade-authority
+overeenkwam met het gebruikte keypair. Na elk commando zijn het log (`Closed Program
+<id>`) en het verdwijnen van de ProgramData gecontroleerd. De gedeployde binaries zijn
+vooraf vanaf devnet gedumpt en met SHA-256 privé gearchiveerd (buiten de repo), zodat
+de rode testsuite straks lokaal tegen exact deze builds kan draaien.
+
+| Programma | Close-signature | Slot | Teruggewonnen (SOL) |
+|---|---|---|---|
+| `8M5ruFEhFfenHSkjsUcf2FaZFKKKamJEHWRCSfttNHi6` | `2SyTwmpw4qxqfwHoonDVJjw8nxNuWJrLKvJd8KnMUTBrcH7yerySYRtN9FS97XbQrDxh5cqEqvB8teYddm91NuiY` | 503635298 | 2,73318732 |
+| `9D2fU2g13Y55uvk6kLiHRknxd6rzu84nsHy6gnjTLqzt` | `2gXh5a52kEZZkj8eMBHAJ1PKkENu2nZtshj7ZUNaKYUvLDZnCoKVgbE5Axabs7f2o8SQFHSNJGxfdDJop6BW9viv` | 503635431 | 3,15726572 |
+| `6YLEj7ywUALhoUS5uNFkdp8docvyoEgYQ2ZoqF1GfgVF` | `5fNdnrbGTfat5DbynV6W3wSxBm2B26EvTUc17WE54zXTMzrPM6AE7m8Zc5iztymsszxmGFw9L6o4XJ8vjUkDBQSx` | 503636004 | 2,73318732 |
+| `5oUPUTuSdU3bWLtVTdcisu1BtgwNt29jH4fVTnfH2XiM` | `3kUksPMAdUuFX1nRCuGfPtDTMT6QFpMnDoZDF8Rs9871nPWwbWKHvtfQFdYKXr89wBS5mnqMxnc7RNQG65gzbHqe` | 503636459 | 3,17957708 |
+| `9sbzeTmpkAjEHkN9j4PoKcoZrf6ALhzfip28sZPtfdbN` | `26QZez1i2uDwDvre2TPuc4yVPPLCA3NtZXGP7C5HPzZDwDcmAgqmuJXweiH8ZnR3dpgWMpEP3LcsfgsrKo4Z8uQ5` | 503636714 | 2,54169164 |
+| **Totaal** | | | **14,34490908** naar `G1qgHzMxNHqewWEKzEoV46GUXjDrsuD4P8LQ97T6gNXp` |
+
+Het saldo van G1qg sluit tot op de lamport: +14,34490908 SOL, min 0,00004 SOL aan fees.
+
+**Gevolg:** geen enkele instructie van deze builds is op deze adressen nog aan te roepen,
+ook `pq_write_data` niet. Een gesloten programma-ID kan nooit opnieuw gedeployed worden.
+De volgende instance krijgt een nieuw ID.
+
+**Blijvend vast (geen actie mogelijk):**
+- **Rest-rent op de programma-accounts zelf:** 4 × 0,00083312 SOL, plus 14,001038612 SOL
+  op `5oUPUTu…`. Die 14 SOL is daar op 09-14 en 09-21 per vergissing heen gestuurd
+  (1 transfer + 2 faucet-airdrops); zie de correctie in §18.
+- **0,67065144 SOL rent in 181 accounts die van de programma's waren** (Config, vaults,
+  submissions), plus **alle vault-tokens**.
+- **Waarom dit niet terug kan (loader-semantiek, bron nagelezen in Agave 4.1.2/4.3.0):**
+  - `Close` maakt alleen de ProgramData leeg. Het programma-account wordt alleen
+    gecontroleerd en als tombstone gemarkeerd.
+  - Geen van de acht loader-instructies haalt lamports van een programma-account, en
+    een programma-account zelf sluiten wordt geweigerd ("Account does not support
+    closing").
+  - Accounts van het programma kan alleen het programma zelf debiteren, en dat kan niet
+    meer draaien.
+  - De vault-tokens staan op token-accounts met een PDA van het gesloten programma als
+    authority. Niemand kan daar nog voor tekenen.
+  - Alles is devnet: geen echte waarde.
+
+**Vervolg:** de mint-authorities van de vault-mints intrekken (spoor C, apart te
+beslissen), en de herbouw volgens het niet-publieke herstelplan (buiten de repo). Dat
+plan blijft privé tot de gevonden problemen zijn opgelost.
